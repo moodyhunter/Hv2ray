@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Hv2ray Module"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Hv2ray EntryAbility"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Hv2ray"
+    }
+  ]
+}

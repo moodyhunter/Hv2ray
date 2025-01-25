@@ -1,0 +1,11 @@
+{
+  name: "entry",
+  version: "1.0.0",
+  description: "Hv2ray entrypoint",
+  main: "",
+  author: "",
+  license: "",
+  dependencies: {
+    "libnative.so": "file:./src/main/cpp/types/libnative"
+  },
+}
