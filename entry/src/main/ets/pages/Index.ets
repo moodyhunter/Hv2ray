@@ -124,6 +124,7 @@ struct Index {
                             .width(150)
                             .margin({ bottom: 30 })
                             .onClick(async () => {
+                                Logging.Info(TAG, `onStart`);
                                 // verify if JSON is valid
                                 let config = Hv2rayPreferences.GetConfig(getContext(this));
                                 try {
@@ -132,7 +133,12 @@ struct Index {
                                     promptAction.showToast({ message: `Invalid JSON configuration`, duration: 2000 })
                                     return;
                                 }
-                                await vpnExtension.startVpnExtensionAbility(want);
+                                try {
+                                    await vpnExtension.startVpnExtensionAbility(want);
+                                } catch (e) {
+                                    Logging.Error(TAG, `failed to start VpnAbility: ${JSON.stringify(e)}`);
+                                }
+                                Logging.Info(TAG, `onStart done`);
                             })
 
                         Button("Stop")

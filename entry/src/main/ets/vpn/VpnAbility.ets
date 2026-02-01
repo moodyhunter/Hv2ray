@@ -45,9 +45,9 @@ class VpnConfig {
         this.addresses = [
             new AddressWithPrefix(new Address(tunIp, AddressFamily.IPv4), 24)
         ];
-        this.trustedApplications = trustedApplications;
+        this.trustedApplications = [];
         this.mtu = 1500;
-        this.dnsAddresses = ["1.1.1.1"];
+        this.dnsAddresses = ["8.8.8.8"];
     }
 }
 
@@ -55,6 +55,7 @@ export class VpnAbility extends VpnExtensionAbility {
     vpnConnection: vpnExtension.VpnConnection | null = null;
 
     async onCreate(want: Want) {
+        Logging.Info(TAG, `VpnAbility onCreate, want: ${JSON.stringify(want)}`);
         if (this.vpnConnection == null) {
             this.vpnConnection = vpnExtension.createVpnConnection(this.context);
         }
@@ -64,7 +65,14 @@ export class VpnAbility extends VpnExtensionAbility {
         ];
 
         let config = new VpnConfig(TUN_IP, TRUSTED_APPS);
-        let tunFd = await this.vpnConnection.create(config);
+        let tunFd: number;
+        try {
+            tunFd = await this.vpnConnection.create(config);
+        } catch (error) {
+            Logging.Error(TAG, `failed to create new VpnConnection: ${JSON.stringify(error)}`);
+            await this.vpnConnection.destroy();
+            return;
+        }
         if (tunFd < 0) {
             Logging.Error(TAG, `Failed to create VPN: ${tunFd}`);
             return false;

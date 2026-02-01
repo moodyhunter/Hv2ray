@@ -4,12 +4,18 @@
     type: "entry",
     description: "$string:module_desc",
     mainElement: "EntryAbility",
-    deviceTypes: ["phone", "tablet", "2in1"],
+    deviceTypes: [
+      "phone",
+      "tablet",
+      "2in1"
+    ],
     deliveryWithInstall: true,
     installationFree: false,
     pages: "$profile:main_pages",
     "requestPermissions": [
-      { "name" : "ohos.permission.INTERNET" },
+      {
+        "name": "ohos.permission.INTERNET"
+      },
     ],
     abilities: [
       {
@@ -23,8 +29,12 @@
         exported: true,
         skills: [
           {
-            entities: ["entity.system.home"],
-            actions: ["action.system.home"],
+            entities: [
+              "entity.system.home"
+            ],
+            actions: [
+              "action.system.home"
+            ],
           },
         ],
       },
@@ -44,6 +54,7 @@
       },
       {
         "name": "VpnAbility",
+        "description": "VpnAbility",
         "srcEntry": "./ets/vpn/VpnAbility.ets",
         "type": "vpn"
       }
