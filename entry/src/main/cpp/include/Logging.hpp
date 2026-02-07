@@ -1,6 +1,6 @@
 #pragma once
 
-#define LOG_DOMAIN 0
+#define LOG_DOMAIN 0xABCD
 
 #ifndef LOG_TAG
 #error "LOG_TAG must be defined"

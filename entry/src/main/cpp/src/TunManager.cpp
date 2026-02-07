@@ -24,7 +24,7 @@ static constexpr LogLevel convert_loglevel(HevLoggerLevel in)
 
 static void do_logging_hev(HevLoggerLevel level, const char *fmt, va_list ap)
 {
-    if (level == HEV_LOGGER_DEBUG)
+    if (level <= HEV_LOGGER_INFO)
         return; // we don't need debug log
 
     char buf[1024];
@@ -58,9 +58,18 @@ void TunManager::StartTun(long tunFd, int socks5Port)
             std::this_thread::sleep_for(statsInterval * 1s);
             size_t tx, rx;
             hev_socks5_tunnel_stats(nullptr, &tx, nullptr, &rx);
-            const size_t speed_tx = (tx - last_tx) / statsInterval, speed_rx = (rx - last_rx) / statsInterval;
-            last_tx = tx, last_rx = rx;
-            EmitStatistics(Statistics{ speed_tx, speed_rx });
+            if (tx >= last_tx && rx >= last_rx)
+            {
+                const size_t speed_tx = (tx - last_tx) / statsInterval;
+                const size_t speed_rx = (rx - last_rx) / statsInterval;
+                last_tx = tx, last_rx = rx;
+                EmitStatistics(speed_tx, speed_rx);
+            }
+            else
+            {
+                LogError("wrap detected");
+                EmitStatistics(0, 0);
+            }
         }
     };
 
@@ -84,46 +93,13 @@ void TunManager::StopTun()
 void TunManager::RegisterStatisticsCallback(napi_env env, napi_value callback, int interval)
 {
     LogInfo("TunManager::RegisterStatisticsCallback");
-
-    if (tsf_stats)
-    {
-        LogInfo("TunManager::RegisterStatisticsCallback: release old tsf_stats");
-        napi_release_threadsafe_function(tsf_stats, napi_tsfn_release);
-    }
-
-    napi_value resource_name;
-    napi_create_string_utf8(env, "stats", NAPI_AUTO_LENGTH, &resource_name);
-    napi_create_threadsafe_function(
-        env, callback, nullptr, resource_name, 0, 1, nullptr, nullptr, nullptr,
-        [](napi_env env, napi_value js_callback, void *context, void *data)
-        {
-            (void) context;
-
-            napi_value undefined;
-            VERIFY_ERR(napi_get_undefined(env, &undefined), "Failed to get undefined");
-
-            // create object from tsf_stats
-            napi_value obj;
-            {
-                Statistics tsf_stats = *(Statistics *) data;
-                VERIFY_ERR(napi_create_object(env, &obj), "Failed to create object");
-
-                napi_value tx, rx;
-                VERIFY_ERR(napi_create_int64(env, tsf_stats.tx, &tx), "Failed to create tx");
-                VERIFY_ERR(napi_create_int64(env, tsf_stats.rx, &rx), "Failed to create rx");
-
-                VERIFY_ERR(napi_set_named_property(env, obj, "tx", tx), "Failed to set tx");
-                VERIFY_ERR(napi_set_named_property(env, obj, "rx", rx), "Failed to set rx");
-            }
-
-            VERIFY_ERR(napi_call_function(env, undefined, js_callback, 1, &obj, nullptr), "Failed to call JS callback");
-        },
-        &tsf_stats);
-
+    g_callbackContexts.Clear();
+    g_callbackContexts.AddCallback(env, "StatisticsCallback", callback);
     statsInterval = interval;
 }
 
-void TunManager::EmitStatistics(const Statistics &stats) const
+void TunManager::EmitStatistics(size_t tx, size_t rx) const
 {
-    napi_call_threadsafe_function(tsf_stats, (void *) &stats, napi_tsfn_blocking);
+    const auto newStats = new Statistics(tx, rx);
+    g_callbackContexts.InvokeAll(newStats);
 }

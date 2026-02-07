@@ -1,0 +1,11 @@
+{
+  "app": {
+    "bundleName": "me.moody.hv2ray",
+    "patchVersionCode": 2000023,
+    "versionCode": 1000000
+  },
+  "module": {
+    "name": "entry",
+    "type": "hotreload"
+  }
+}

@@ -4,10 +4,11 @@ import { Context } from '@kit.AbilityKit';
 class Hv2rayPreferences {
     private static pref?: preferences.Preferences = undefined;
 
-    private static EnsurePreference(context: Context, name: string) {
+    private static EnsurePreference(context: Context, name: string): preferences.Preferences {
         if (!Hv2rayPreferences.pref) {
             Hv2rayPreferences.pref = preferences.getPreferencesSync(context, { name: name });
         }
+        return Hv2rayPreferences.pref;
     }
 
     static GetSocks5Port(context: Context): number {

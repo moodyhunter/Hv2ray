@@ -16,6 +16,18 @@
       {
         "name": "ohos.permission.INTERNET"
       },
+      {
+        "name": "ohos.permission.KEEP_BACKGROUND_RUNNING"
+      },
+      {
+        "name": "ohos.permission.KEEP_BACKGROUND_RUNNING_SYSTEM",
+        "reason": "$string:module_desc",
+        "usedScene": {
+          "abilities": [
+            "EntryAbility"
+          ]
+        }
+      }
     ],
     abilities: [
       {
@@ -34,10 +46,13 @@
             ],
             actions: [
               "action.system.home"
-            ],
-          },
+            ]
+          }
         ],
-      },
+        "backgroundModes": [
+          "taskKeeping"
+        ]
+      }
     ],
     extensionAbilities: [
       {
@@ -48,9 +63,9 @@
         metadata: [
           {
             name: "ohos.extension.backup",
-            resource: "$profile:backup_config",
-          },
-        ],
+            resource: "$profile:backup_config"
+          }
+        ]
       },
       {
         "name": "VpnAbility",
@@ -58,6 +73,6 @@
         "srcEntry": "./ets/vpn/VpnAbility.ets",
         "type": "vpn"
       }
-    ],
-  },
+    ]
+  }
 }

@@ -32,6 +32,8 @@ struct NapiValueConverter
         }                                                                                                                                                                \
     }
 
+DeclareNapiValueConverter(napi_function, napi_value, [](napi_env, napi_value value, napi_value *ret) { *ret = value; });
+DeclareNapiValueConverter(napi_object, napi_value, [](napi_env, napi_value value, napi_value *ret) { *ret = value; });
 DeclareNapiValueConverter(napi_number, long, napi_get_value_int64);
 DeclareNapiValueConverter(napi_boolean, bool, napi_get_value_bool);
 DeclareNapiValueConverter(napi_string, std::string,
@@ -42,15 +44,13 @@ DeclareNapiValueConverter(napi_string, std::string,
                               ret->resize(len, '\0');
                               napi_get_value_string_utf8(env, value, ret->data(), len + 1, &len);
                           });
-DeclareNapiValueConverter(napi_function, napi_value, [](napi_env, napi_value value, napi_value *ret) { *ret = value; });
-DeclareNapiValueConverter(napi_object, napi_value, [](napi_env, napi_value value, napi_value *ret) { *ret = value; });
 
 template<napi_valuetype... types>
 struct NapiArgs
 {
     static constexpr auto NTypes = sizeof...(types);
     using Result = std::tuple<typename NapiValueConverter<types>::type_t...>;
-    using OptionalResult = std::tuple<std::optional<typename NapiValueConverter<types>::type_t>...>;
+    using OptionalResult = std::tuple<typename NapiValueConverter<types>::optional_t...>;
     using NapiValueArray = std::array<napi_value, NTypes>;
 
     template<class S = std::make_index_sequence<NTypes>>

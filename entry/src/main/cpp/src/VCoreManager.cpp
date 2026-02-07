@@ -12,7 +12,7 @@
 
 std::optional<std::string> VCoreManager::StartVCore(const std::string &config)
 {
-    LogInfo("VCoreManager::StartVCore(config: %s)", config.c_str());
+    LogInfo("VCoreManager::StartVCore");
     const char *errmsg = StartV2RayKernel((char *) config.c_str());
     if (errmsg != nullptr)
     {

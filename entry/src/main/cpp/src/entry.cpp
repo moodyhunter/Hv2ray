@@ -7,6 +7,7 @@
 
 #include <node_api.h>
 #include <stdio.h>
+#include <unistd.h>
 
 static napi_value NAPI_Global_startTun(napi_env env, napi_callback_info info)
 {
@@ -52,6 +53,12 @@ static napi_value NAPI_Global_startVCore(napi_env env, napi_callback_info info)
     const auto [socks5Port, config_string] = *input;
     const auto err = VCoreManager::Instance().StartVCore(config_string);
 
+    int fds[2];
+    const auto errc = pipe(fds);
+    LogError("pipe error: %{public}d, [%{public}d, %{public}d]", errc, fds[0], fds[1]);
+    close(fds[0]);
+    close(fds[1]);
+
     if (err.has_value())
     {
         napi_throw_error(env, nullptr, err.value().c_str());
@@ -71,43 +78,6 @@ static napi_value NAPI_Global_stopVCore(napi_env env, napi_callback_info info)
     return nullptr;
 }
 
-static napi_value NAPI_Global_internalTest(napi_env env, napi_callback_info info)
-{
-    const auto input = NapiArgs<napi_number>::Get(env, info);
-    if (!input.has_value())
-        return nullptr;
-
-    const auto [arg1] = *input;
-
-    const size_t command = arg1 & 0xFFFF000000000000 >> 48;
-    const size_t subcommand = arg1 & 0x0000FFFF00000000 >> 32;
-    const size_t data1 = arg1 & 0x00000000FFFF0000 >> 16;
-    const size_t data2 = arg1 & 0x000000000000FFFF >> 0;
-
-    int ret = 0;
-    switch (command)
-    {
-        case 1:
-        {
-            switch (subcommand)
-            {
-                case 1: TunManager::Instance().EmitStatistics(Statistics{ data1, data2 });
-                default: goto unknown;
-            }
-        }
-        default: goto unknown;
-    }
-
-ret:
-    napi_value retValue;
-    napi_create_int32(env, ret, &retValue);
-    return retValue;
-
-unknown:
-    ret = -1;
-    goto ret;
-}
-
 static napi_value InitNativeModule(napi_env env, napi_value exports)
 {
     napi_property_descriptor desc[] = {
@@ -121,8 +91,6 @@ static napi_value InitNativeModule(napi_env env, napi_value exports)
         { "startVCore", nullptr, NAPI_Global_startVCore, nullptr, nullptr, nullptr, napi_default, nullptr },
         // stopVCore: () => void
         { "stopVCore", nullptr, NAPI_Global_stopVCore, nullptr, nullptr, nullptr, napi_default, nullptr },
-        // internalTest: (arg1: number) => number
-        { "internalTest", nullptr, NAPI_Global_internalTest, nullptr, nullptr, nullptr, napi_default, nullptr },
     };
 
     const auto status = napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);

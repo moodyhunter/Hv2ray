@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 interface Statistics {
-  tx: number;
-  rx: number;
+    tx: number;
+    rx: number;
 }
 
 /**
@@ -29,13 +29,8 @@ declare const stopVCore: () => void;
  * Register a callback function to receive statistics.
  */
 declare const onStatisticsEvent: (
-  interval: number,
-  callback: (stats: Statistics) => void
+    interval: number,
+    callback: (stats: Statistics) => void
 ) => void;
 
-/**
- * Intentionally not documented.
- */
-declare const internalTest: (arg1: number) => number;
-
-export { startTun, stopTun, startVCore, stopVCore, onStatisticsEvent, internalTest, };
+export { startTun, stopTun, startVCore, stopVCore, onStatisticsEvent };
