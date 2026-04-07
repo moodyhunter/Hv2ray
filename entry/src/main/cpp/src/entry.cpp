@@ -6,7 +6,6 @@
 #include "VCoreManager.hpp"
 
 #include <node_api.h>
-#include <stdio.h>
 #include <unistd.h>
 
 static napi_value NAPI_Global_startTun(napi_env env, napi_callback_info info)
@@ -52,13 +51,6 @@ static napi_value NAPI_Global_startVCore(napi_env env, napi_callback_info info)
 
     const auto [socks5Port, config_string] = *input;
     const auto err = VCoreManager::Instance().StartVCore(config_string);
-
-    int fds[2];
-    const auto errc = pipe(fds);
-    LogError("pipe error: %{public}d, [%{public}d, %{public}d]", errc, fds[0], fds[1]);
-    close(fds[0]);
-    close(fds[1]);
-
     if (err.has_value())
     {
         napi_throw_error(env, nullptr, err.value().c_str());

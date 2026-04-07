@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { AbilityConstant, ConfigurationConstant, UIAbility, Want, wantAgent } from '@kit.AbilityKit';
-import { window } from '@kit.ArkUI';
+import { AppStorageV2, window } from '@kit.ArkUI';
 import { BUNDLE_NAME } from 'BuildProfile';
 import Logger from '../utils/Logging';
 import backgroundTaskManager from '@ohos.resourceschedule.backgroundTaskManager';
+import { ConfigManager, ConfigManagerImpl } from '../core/config/ConfigManager';
 
 const TAG = "Hv2ray-EntryAbility";
 
@@ -11,16 +12,23 @@ export default class EntryAbility extends UIAbility {
     async onCreate(_want: Want, launchParam: AbilityConstant.LaunchParam) {
         this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
         Logger.Info(TAG, "onCreate");
+        await ConfigManager.loadConfigurations();
+        await ConfigManager.saveConfigurations();
         await this.startBackgroundRunning();
     }
 
     async onWindowStageCreate(windowStage: window.WindowStage): Promise<void> {
         Logger.Info(TAG, "onWindowStageCreate");
+        await windowStage.loadContent('pages/Index').catch((e: BusinessError) => {
+            Logger.Error(TAG, `Failed to load the content, error: ${JSON.stringify(e)}`);
+        });
 
         try {
-            await windowStage.loadContent('pages/Index');
-        } catch (e) {
-            Logger.Error(TAG, `Failed to load the content, error: ${JSON.stringify(e)}`);
+            let mainWindow = await windowStage.getMainWindow();
+            mainWindow.setWindowDecorVisible(false);
+            mainWindow.setWindowDecorHeight(60);
+        } catch (error) {
+            Logger.Error(TAG, `failed to set window properties: ${JSON.stringify(error)}`)
         }
     }
 
@@ -36,6 +44,10 @@ export default class EntryAbility extends UIAbility {
     onBackground(): void {
         // Ability has back to background
         Logger.Info(TAG, "onBackground");
+    }
+
+    async onPrepareToTerminateAsync(): Promise<boolean> {
+        return true;
     }
 
     private async startBackgroundRunning() {

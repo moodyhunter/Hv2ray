@@ -1,4 +1,3 @@
-
 export enum KernelEventType {
     Starting = 0,
     Started = 1,

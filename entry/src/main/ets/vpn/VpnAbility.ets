@@ -20,7 +20,6 @@ interface V2RayVpnParameters {
 
 export class VpnAbility extends VpnExtensionAbility {
     vpnConnection: vpnExtension.VpnConnection | null = null;
-    config: string = '{}';
     socks5Port: number = 51081;
     kernelCrashed: boolean = false;
 
@@ -31,12 +30,11 @@ export class VpnAbility extends VpnExtensionAbility {
             this.vpnConnection = vpnExtension.createVpnConnection(this.context);
         }
 
-        this.config = (want.parameters?.config as string | undefined) ?? '{}';
         this.socks5Port = (want.parameters?.socks5Port as number | undefined) ?? 51081;
 
         let config: vpnExtension.VpnConfig = {
             addresses: [{ address: { address: TUN_IP, family: 1 }, prefixLength: 24 }],
-            dnsAddresses: ['8.8.8.8'],
+            dnsAddresses: ['8.8.8.8', '8.8.4.4', '1.1.1.1'],
             blockedApplications: [BUNDLE_NAME]
         };
         let tunFd: number;
@@ -59,19 +57,13 @@ export class VpnAbility extends VpnExtensionAbility {
         Logger.Info(TAG, `Starting VPN on fd ${tunFd}`);
 
         try {
-            native.startVCore(this.socks5Port, this.config);
             native.startTun(tunFd, this.socks5Port);
             native.onStatisticsEvent(1, (stats: Stat) => {
                 CommonEventUtils.publishStatsEvent(stats);
             });
         } catch (e) {
             Logger.Error(TAG, `Failed to start VPN: ${e.message}`);
-            let errMsg: string[] = [];
-            for (let line of (e.message as string).split('>')) {
-                line = line.trim();
-                errMsg.push(line);
-            }
-            CommonEventUtils.publishKernelErrorEvent(KernelEventType.Crashed, errMsg);
+            CommonEventUtils.publishKernelErrorEvent(KernelEventType.Crashed, e.message);
             this.kernelCrashed = true;
             await vpnExtension.stopVpnExtensionAbility(want);
             return false;
@@ -86,7 +78,6 @@ export class VpnAbility extends VpnExtensionAbility {
         if (!this.kernelCrashed) {
             CommonEventUtils.publishKernelErrorEvent(KernelEventType.Stopped);
         }
-        native.stopVCore()
         native.stopTun()
         if (this.vpnConnection) {
             try {

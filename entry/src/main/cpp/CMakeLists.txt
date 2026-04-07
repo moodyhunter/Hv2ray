@@ -16,10 +16,19 @@ endif()
 message(STATUS "Configuring for architecture: ${OHOS_ARCH}")
 add_subdirectory(hev-socks5-tunnel)
 
-add_library(libHv2rayCore STATIC IMPORTED)
-set_target_properties(libHv2rayCore PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_LIST_DIR}/core/libHv2rayCore.a)
-set_target_properties(libHv2rayCore PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_LIST_DIR}/core)
-add_library(Hv2ray::Core ALIAS libHv2rayCore)
+macro(add_component NAME TYPE ABBREV AFILE)
+  add_library(${NAME} ${TYPE} IMPORTED)
+  set_target_properties(${NAME} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_LIST_DIR}/core)
+  set_target_properties(${NAME} PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_LIST_DIR}/core/${AFILE})
+  add_library(${ABBREV} ALIAS ${NAME})
+ if ("${TYPE}" STREQUAL "SHARED")
+   file(COPY_FILE core/${AFILE} ${CMAKE_SOURCE_DIR}/../../../libs/arm64-v8a/${AFILE})
+   set_target_properties(${NAME} PROPERTIES IMPORTED_SONAME ${AFILE})
+ endif()
+endmacro()
+
+add_component(Hv2rayCore STATIC Hv2ray::Core libHvCore.a)
+add_component(Hv2rayStats SHARED Hv2ray::Stats libHvStats.so)
 
 add_library(native SHARED
     src/entry.cpp
@@ -44,4 +53,8 @@ target_link_libraries(native PRIVATE
 
     HevSocks5Tunnel
     Hv2ray::Core
+    # Hv2ray::Stats
+    ${CMAKE_CURRENT_LIST_DIR}/core/libHvStats.so
 )
+
+target_link_options(native PRIVATE)

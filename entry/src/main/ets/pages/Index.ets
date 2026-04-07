@@ -2,6 +2,7 @@ import { Home } from './Home';
 import Logger from '../utils/Logging';
 import { Settings } from './Settings';
 import { Configurations } from './Configurations';
+import { GlobalStat } from './PageCommon';
 
 const TAG = "Hv2ray-Index"
 
@@ -13,25 +14,41 @@ struct Index {
     }
 
     build() {
-        Tabs({ barPosition: BarPosition.Start }) {
-            TabContent() {
-                Home()
+        Column() {
+            Row() {
+                Text('Hv2ray')
+                    .fontSize(20)
+                    .fontWeight(FontWeight.Bold)
+                Text('↑  ' + GlobalStat.txRateString + '\n' + '↓  ' + GlobalStat.rxRateString)
+                    .fontSize(13)
+                    .width(100)
             }
-            .tabBar('Home')
+            .justifyContent(FlexAlign.SpaceBetween)
+            .height(60)
+            .width('100%')
+            .padding({ left: 24, right: 160 })
 
-            TabContent() {
-                Configurations()
-            }
-            .tabBar('Config')
+            Tabs({ barPosition: BarPosition.Start }) {
+                TabContent() {
+                    Home()
+                }
+                .tabBar('Home')
 
-            TabContent() {
-                Settings()
+                TabContent() {
+                    Configurations()
+                }
+                .tabBar('Config')
+
+                TabContent() {
+                    Settings()
+                }
+                .tabBar('Settings')
             }
-            .tabBar('Settings')
+            .layoutWeight(1)
+            .vertical(true)
+            .barWidth(80)
         }
         .width('100%')
-        .height('100%') 
-        .vertical(true)
-        .barWidth(80)
+        .height('100%')
     }
 }

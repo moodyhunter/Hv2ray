@@ -6,6 +6,7 @@ import { commonEventManager } from "@kit.BasicServicesKit";
 const TAG = 'utils/CommonEventUtil';
 
 class CommonEventUtilsImpl {
+    subscribers: commonEventManager.CommonEventSubscriber[] = [];
     constructor() {
         Logger.Info(TAG, `constructor`);
     }
@@ -28,9 +29,10 @@ class CommonEventUtilsImpl {
             publisherBundleName: BUNDLE_NAME,
         });
 
+        this.subscribers.push(subscriber);
+
         try {
             await commonEventManager.subscribeToEvent(subscriber, (event: commonEventManager.CommonEventData) => {
-                Logger.Debug(TAG, `Received common event: ${JSON.stringify(event)}`);
                 callback(event.data ?? '');
             });
         } catch (error) {
