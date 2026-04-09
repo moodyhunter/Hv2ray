@@ -8,6 +8,9 @@ import Hv2rayPreferences from '../utils/Preferences';
 import { CommonEventUtils } from '../utils/CommonEventUtils';
 import { GlobalStat, prettyPrintBytes } from './PageCommon'
 import { VCoreManager } from '../vpn/VCoreManager';
+import { IConnection, IGroup } from '../core/config/ConfigCommon';
+import { ConfigManager } from '../core/config/ConfigManager';
+import { ConfigRoot, Inbound } from '../core/config/Config';
 
 
 const TAG = "Hv2ray-HomePage"
@@ -35,10 +38,43 @@ struct SpeedStatsRow {
     }
 }
 
+@ObservedV2
+class ConnectionInfo {
+    private readonly connId: string;
+    public readonly config: ConfigRoot;
+    @Trace connectionName: string;
+    @Trace remoteHost: string;
+    @Trace remotePort: number;
+    @Trace protocol: string;
+    @Trace transport: string;
+
+    constructor(connId: string, root: ConfigRoot) {
+        this.connId = connId;
+        this.config = root;
+        this.connectionName = ConfigManager.getConnection(connId)?.name ?? "<invalid>";
+        this.remoteHost = root.outbounds[0].settings['address'] as string;
+        this.remotePort = root.outbounds[0].settings['port'] as number;
+        this.protocol = root.outbounds[0].protocol;
+        this.transport = root.outbounds[0].streamSettings.transport;
+    }
+
+    static async getConnectionInfo(connId: string): Promise<ConnectionInfo> {
+        const root = (await ConfigManager.loadConnectionFromFile(connId))!;
+        return new ConnectionInfo(connId, root);
+    }
+}
+
 
 @ComponentV2
 export struct Home {
     @Local kernelStatus: KernelEventType = KernelEventType.Stopped;
+    @Local selectedConnection: string = '';
+    @Local connectionInfo: ConnectionInfo | undefined = undefined;
+
+    @Monitor('selectedConnection')
+    async onSelectedConnectionChanged() {
+        this.connectionInfo = await ConnectionInfo.getConnectionInfo(this.selectedConnection);
+    }
 
     private get kernelStatusColor(): Color {
         switch (this.kernelStatus) {
@@ -63,6 +99,28 @@ export struct Home {
                     })
             }
         });
+    }
+
+    private getCurrentConfig(port: number): string {
+        if (!this.connectionInfo) {
+            return '';
+        }
+        const configRoot: ConfigRoot = JSON.parse(JSON.stringify(this.connectionInfo.config));
+        const socks5Inbound: Inbound = {
+            listen: '127.0.0.1',
+            port: port.toString(),
+            settings: {
+                'udpEnabled': true,
+            },
+            protocol: 'socks',
+            tag: 'default-inbound',
+            sniffing: undefined,
+        };
+        configRoot.inbounds.push(socks5Inbound);
+
+        const configRootObject = configRoot as object as Record<string, object>;
+
+        return JSON.stringify(configRootObject);
     }
 
     private async doStartKernel(): Promise<void> {
@@ -104,15 +162,16 @@ export struct Home {
                 });
         }
 
+        const socks5Port = Hv2rayPreferences.GetSocks5Port(context);
         let want: Want = {
             bundleName: BUNDLE_NAME,
             abilityName: 'VpnAbility',
             parameters: {
-                'socks5Port': Hv2rayPreferences.GetSocks5Port(context),
+                'socks5Port': socks5Port,
             }
         };
 
-        const ret = VCoreManager.StartVCore(Hv2rayPreferences.GetSocks5Port(context), Hv2rayPreferences.GetConfig(context));
+        const ret = VCoreManager.StartVCore(socks5Port, this.getCurrentConfig(socks5Port));
         if (!ret) {
             return;
         }
@@ -135,72 +194,193 @@ export struct Home {
         }
     }
 
-    build() {
-        Column({ space: 40 }) {
-            Row({ space: 32 }) {
-                Circle()
-                    .width(100)
-                    .height(100)
-                    .foregroundColor(this.kernelStatusColor)
+    @Builder
+    kernelStatusIcon() {
+        Circle()
+            .width(100)
+            .height(100)
+            .foregroundColor(this.kernelStatusColor)
+    }
 
-                Text(KernelEventType[this.kernelStatus])
-                    .fontSize(40)
-                    .fontWeight(FontWeight.Bold)
-            }
+    @Builder
+    statusComponent() {
+        Row({ space: 32 }) {
+            this.kernelStatusIcon()
+            Text(KernelEventType[this.kernelStatus])
+                .fontSize(40)
+                .fontWeight(FontWeight.Bold)
+        }
+    }
 
-            this.speedStats();
+    @Builder
+    controlButtons() {
+        Row({ space: 30 }) {
+            Button(this.kernelStatus === KernelEventType.Started ? 'Restart' : 'Start')
+                .fontSize(30)
+                .fontWeight(FontWeight.Bold)
+                .backgroundColor(Color.Green)
+                .padding(20)
+                .width(150)
+                .onClick(async () => {
+                    Logger.Info(TAG, `onStart`);
+                    const currentStatus = this.kernelStatus;
+                    VCoreManager.StopVCore();
+                    await vpnExtension.stopVpnExtensionAbility({
+                        bundleName: BUNDLE_NAME,
+                        abilityName: 'VpnAbility',
+                    })
+                        .catch(() => {
+                            Logger.Error(TAG, `failed to stop VpnAbility prior to start`)
+                        });
 
-            Row({ space: 30 }) {
-                Button(this.kernelStatus === KernelEventType.Started ? 'Restart' : 'Start')
+                    if (currentStatus === KernelEventType.Started) {
+                        setTimeout(() => {
+                            this.doStartKernel();
+                        }, 500);
+                    } else {
+                        await this.doStartKernel();
+                    }
+
+                })
+
+            if (this.kernelStatus === KernelEventType.Started) {
+                Button("Stop")
                     .fontSize(30)
                     .fontWeight(FontWeight.Bold)
-                    .backgroundColor(Color.Green)
+                    .backgroundColor(Color.Red)
                     .padding(20)
                     .width(150)
                     .onClick(async () => {
-                        Logger.Info(TAG, `onStart`);
-                        const currentStatus = this.kernelStatus;
-                        VCoreManager.StopVCore();
-                        await vpnExtension.stopVpnExtensionAbility({
-                            bundleName: BUNDLE_NAME,
-                            abilityName: 'VpnAbility',
-                        })
-                            .catch(() => {
-                                Logger.Error(TAG, `failed to stop VpnAbility prior to start`)
+                        try {
+                            await vpnExtension.stopVpnExtensionAbility({
+                                bundleName: BUNDLE_NAME,
+                                abilityName: 'VpnAbility',
                             });
-
-                        if (currentStatus === KernelEventType.Started) {
-                            setTimeout(() => {
-                                this.doStartKernel();
-                            }, 500);
-                        } else {
-                            await this.doStartKernel();
+                        } catch (error) {
+                            Logger.Error(TAG, `failed to stop VpnAbility: ${JSON.stringify(error)}`);
                         }
-
                     })
-
-                if (this.kernelStatus === KernelEventType.Started) {
-                    Button("Stop")
-                        .fontSize(30)
-                        .fontWeight(FontWeight.Bold)
-                        .backgroundColor(Color.Red)
-                        .padding(20)
-                        .width(150)
-                        .onClick(async () => {
-                            try {
-                                await vpnExtension.stopVpnExtensionAbility({
-                                    bundleName: BUNDLE_NAME,
-                                    abilityName: 'VpnAbility',
-                                });
-                            } catch (error) {
-                                Logger.Error(TAG, `failed to stop VpnAbility: ${JSON.stringify(error)}`);
-                            }
-                        })
-                }
             }
         }
+    }
+
+    @Builder
+    selectedConnectionInfo() {
+        Column() {
+            if (this.connectionInfo) {
+                Text(this.connectionInfo.connectionName)
+                    .fontSize(30)
+                    .fontWeight(FontWeight.Bold)
+                Text(this.connectionInfo.remoteHost + ':' + this.connectionInfo.remotePort)
+                    .fontWeight(FontWeight.Bold)
+                Text(this.connectionInfo.protocol + '/' + this.connectionInfo.transport)
+            } else {
+                Text('None selected')
+            }
+        }
+        .width('100%')
+        .margin({ bottom: 50 })
+    }
+
+    @Builder
+    connectionItem(conn: IConnection | undefined) {
+        Row() {
+            if (conn) {
+                Button(conn.name)
+                    .width('100%')
+                    .onClick(() => {
+                        this.selectedConnection = conn.id;
+                    })
+                    .backgroundColor(this.selectedConnection === conn.id ? Color.Red : undefined)
+            } else {
+                Text('invalid')
+            }
+        }
+        .width('100%')
+    }
+
+    @Builder
+    groupItem(group: IGroup) {
+        Column() {
+            Row() {
+                Text(group.name)
+                    .fontSize(18)
+                    .fontWeight(FontWeight.Bold)
+                    .margin({ left: 8 })
+                Button('Edit')
+            }
+            .borderRadius(8)
+            .padding(8)
+            .justifyContent(FlexAlign.SpaceBetween)
+            .backgroundColor($r('sys.color.gray_03'))
+            .height(48)
+            .width('100%')
+
+            List({ space: 16 }) {
+                ForEach(group.connections, (connId: string) => {
+                    ListItem() {
+                        this.connectionItem(ConfigManager.getConnection(connId));
+                    }
+                }, (connId: string) => connId)
+            }
+            .padding({ left: 8, right: 8 })
+            .width('100%')
+            .height(300)
+        }
+    }
+
+    @Builder
+    addSomethingButton() {
+        Button({ type: ButtonType.Circle }) {
+            SymbolGlyph($r('sys.symbol.plus'))
+                .fontColor([$r('sys.color.font_primary')])
+                .fontSize(24)
+        }
+        .backgroundColor($r('sys.color.brand'))
+        .width(48)
+        .height(48)
+    }
+
+    build() {
+        Row() {
+            Column() {
+                // list all groups
+                List({ space: 8 }) {
+                    ForEach(Array.from(ConfigManager.allGroups.values()), (group: IGroup) => {
+                        ListItem() {
+                            this.groupItem(group);
+                        }
+                    }, (group: IGroup) => group.id)
+                }
+                .backgroundColor($r('sys.color.gray_02'))
+                .padding(8)
+                .width('100%')
+                .height('100%')
+
+                Row() {
+                    this.addSomethingButton();
+                }
+                .hitTestBehavior(HitTestMode.Transparent)
+                .justifyContent(FlexAlign.Center)
+                .width('100%')
+                .position({ bottom: '20vp' })
+            } 
+            .width(350)
+            .constraintSize({ minWidth: 300 })
+            .height('100%')
+
+            Column({ space: 40 }) {
+                this.selectedConnectionInfo();
+                this.statusComponent();
+                this.speedStats();
+                this.controlButtons();
+            }
+            .padding(16)
+            .layoutWeight(1)
+            .justifyContent(FlexAlign.Center)
+            .height('100%')
+        }
         .height('100%')
-        .height('100%')
-        .justifyContent(FlexAlign.Center)
+        .width('100%')
     }
 }

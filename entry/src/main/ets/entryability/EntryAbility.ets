@@ -10,7 +10,8 @@ const TAG = "Hv2ray-EntryAbility";
 
 export default class EntryAbility extends UIAbility {
     async onCreate(_want: Want, launchParam: AbilityConstant.LaunchParam) {
-        this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
+        this.context.getApplicationContext()
+            .setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
         Logger.Info(TAG, "onCreate");
         await ConfigManager.loadConfigurations();
         await ConfigManager.saveConfigurations();
@@ -19,9 +20,10 @@ export default class EntryAbility extends UIAbility {
 
     async onWindowStageCreate(windowStage: window.WindowStage): Promise<void> {
         Logger.Info(TAG, "onWindowStageCreate");
-        await windowStage.loadContent('pages/Index').catch((e: BusinessError) => {
-            Logger.Error(TAG, `Failed to load the content, error: ${JSON.stringify(e)}`);
-        });
+        await windowStage.loadContent('pages/Index')
+            .catch((e: BusinessError) => {
+                Logger.Error(TAG, `Failed to load the content, error: ${JSON.stringify(e)}`);
+            });
 
         try {
             let mainWindow = await windowStage.getMainWindow();

@@ -1,13 +1,13 @@
-import { Config } from "./config/Config";
+import { ConfigRoot } from "./config/Config";
 
 @ObservedV2
 export class KernelManagerImpl {
-    private activeConfig_: Optional<Config> = undefined;
+    private activeConfig_: Optional<ConfigRoot> = undefined;
 
     constructor() {
     }
 
-    public get activeConfig(): Config | undefined {
+    public get activeConfig(): ConfigRoot | undefined {
         return this.activeConfig_;
     }
 }

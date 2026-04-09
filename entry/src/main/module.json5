@@ -20,13 +20,7 @@
         "name": "ohos.permission.KEEP_BACKGROUND_RUNNING"
       },
       {
-        "name": "ohos.permission.KEEP_BACKGROUND_RUNNING_SYSTEM",
-        "reason": "$string:module_desc",
-        "usedScene": {
-          "abilities": [
-            "EntryAbility"
-          ]
-        }
+        "name": "ohos.permission.WINDOW_TOPMOST"
       }
     ],
     abilities: [

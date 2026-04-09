@@ -1,67 +1,149 @@
 import { http } from "@kit.NetworkKit";
 import Logger from "../utils/Logging";
-import { util } from "@kit.ArkTS";
-import { ABC, shareLinkIoBuilder } from "../core/ShareLinkIO";
+import { IShareLinkImporter, IShareLinkImporterResult } from "../core/sharelink/ShareLinkIO";
+import { VMessShareLinkImporter } from "../core/sharelink/VMess";
+import { Utils } from "../utils/Common";
+import { ConfigManager } from "../core/config/ConfigManager";
+import { ConfigRoot } from "../core/config/Config";
 
 const TAG = 'Pages/Configuration';
 
-@Builder
-function noopBuilder() {
-    Text('NOOP')
-}
+const SHARE_LINK_IMPORTERS: IShareLinkImporter[] = [
+    new VMessShareLinkImporter()
+];
 
 @ComponentV2
 export struct Configurations {
-    private subscriptionLink: string = '';
-    @Local private subscriptionContent: string = '';
-    @Local private subscriptionContent2: string = '';
-    @Local private abc: ABC = new ABC();
-
-    builderVar: WrappedBuilder<[]> = wrapBuilder(noopBuilder);
+    @Local private subscriptionLink: string = 'http://127.0.0.1:8000/sub.txt';
+    @Local private subscriptionContent: string[] = [];
+    @Local private decoded: string[] = [];
+    @Local private useProxy: boolean = false;
 
     aboutToAppear(): void {
-        this.builderVar = wrapBuilder(shareLinkIoBuilder);
+
+    }
+
+    private async doGetSubscriptionData(): Promise<void> {
+        try {
+            const req = http.createHttp();
+            let options: http.HttpRequestOptions = {
+                // usingProxy: {
+                // host: '127.0.0.1',
+                // port: 12345,
+                // exclusionList: []
+                // }
+            };
+            let response = await req.request(this.subscriptionLink, options);
+            const decoded = Utils.base64Decode(response.result as string);
+            this.subscriptionContent = decoded.split('\n');
+        } catch (e) {
+            Logger.Error(TAG, `error: ${JSON.stringify(e)}`);
+        }
+    }
+
+    private decode() {
+        for (const line of this.subscriptionContent) {
+            const item = this.decodeOne(line);
+            if (item) {
+                this.decoded.push(JSON.stringify(item));
+
+                let configRoot: ConfigRoot = {
+                    inbounds: [],
+                    outbounds: [
+                        item.outbound
+                    ]
+                };
+                ConfigManager.addConnectionToGroup(item.name, 'subscription', configRoot)
+            }
+        }
+    }
+
+    private decodeOne(uri: string): IShareLinkImporterResult | undefined {
+        for (let importer of SHARE_LINK_IMPORTERS) {
+            if (importer.matcher(uri)) {
+                const imported = importer.decode(uri);
+                if (imported) {
+                    return imported;
+                }
+            }
+        }
+
+        Logger.Error(TAG, `failed to import ${uri}`);
+        return undefined;
+    }
+
+    @Builder
+    useProxyCheckbox() {
+        Row() {
+            Checkbox()
+                .select(this.useProxy!!)
+            Text('Use Proxy')
+        }
     }
 
     build() {
-        Column() {
-            this.builderVar.builder()
-            TextInput({ placeholder: 'subscription link' })
-                .onChange((content: string) => {
-                    this.subscriptionLink = content;
+        Column({ space: 16 }) {
+            Row ({ space: 8 }) {
+                TextInput({ placeholder: 'subscription link', text: this.subscriptionLink!! })
+                    .height('100%')
+                    .layoutWeight(1)
+
+                this.useProxyCheckbox();
+                Button('GET')
+                    .onClick(async () => {
+                        Logger.Warn(TAG, `GET using proxy: ${this.useProxy}`)
+                        await this.doGetSubscriptionData();
+                    })
+                    .height('100%')
+
+            }
+            .justifyContent(FlexAlign.Center)
+            .width('100%')
+            .height(40)
+
+            Column({ space: 8 }) {
+                Text('Subscription Content')
+                List({ space: 8 }) {
+                    ForEach(this.subscriptionContent, (item: string) => {
+                        ListItem() {
+                            Text(item)
+                        }
+                        .border({ color: Color.Red, width: 1 })
+                        .backgroundColor($r('sys.color.gray_03'))
+                    })
+                }
+                .width('100%')
+                .height(250)
+                .backgroundColor($r('sys.color.gray_02'))
+            }
+            .layoutWeight(1)
+
+            Button('Start Decoding')
+                .margin(16)
+                .onClick(() => {
+                    this.decoded = [];
+                    this.decode();
                 })
-            Button('GET')
-                .onClick(async () => {
-                    try {
-                        const req = http.createHttp();
-                        let options: http.HttpRequestOptions = {
-                            usingProxy: {
-                                host: '127.0.0.1',
-                                port: 12345,
-                                exclusionList: []
-                            }
-                        };
-                        let response = await req.request(this.subscriptionLink, options);
-                        // Logger.Info(TAG, JSON.stringify(response.result));
-                        this.subscriptionContent = response.result as string;
 
-                        let base64 = new util.Base64Helper();
-
-                        let decodeResult = base64.decodeSync(this.subscriptionContent); //base64转Uint8Array
-
-                        console.info('Decode result: ', decodeResult);
-
-                        let decoder = new util.StringDecoder()
-                        this.subscriptionContent2 = decoder.write(decodeResult);
-                    } catch (e) {
-                        Logger.Error(TAG, `error: ${JSON.stringify(e)}`);
-                    }
-                })
-
-            Text(this.subscriptionContent)
-                .maxLines(10)
-
-            TextArea({ text: this.subscriptionContent2 })
+            Column({ space: 8 }) {
+                Text('Decoded Content')
+                List({ space: 8 }) {
+                    ForEach(this.decoded, (item: string) => {
+                        ListItem() {
+                            Text(item)
+                        }
+                        .border({ color: Color.Green, width: 1 })
+                        .backgroundColor($r('sys.color.gray_03'))
+                    })
+                }
+                .width('100%')
+                .height(250)
+                .backgroundColor($r('sys.color.gray_02'))
+            }
+            .layoutWeight(1)
         }
+        .width('100%')
+        .height('100%')
+        .padding(8)
     }
 }

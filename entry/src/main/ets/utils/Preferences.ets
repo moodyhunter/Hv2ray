@@ -12,21 +12,21 @@ class Hv2rayPreferences {
     }
 
     static GetSocks5Port(context: Context): number {
-        Hv2rayPreferences.EnsurePreference(context, "core");
-        let value = Hv2rayPreferences.pref!.getSync("socks5.port", 51081);
+        const pref = Hv2rayPreferences.EnsurePreference(context, "core");
+        let value = pref.getSync("socks5.port", 51081);
         return value as number;
     }
 
     static GetConfig(context: Context): string {
-        Hv2rayPreferences.EnsurePreference(context, "core");
-        let value = Hv2rayPreferences.pref!.getSync("config", "");
+        const pref = Hv2rayPreferences.EnsurePreference(context, "core");
+        let value = pref.getSync("config", "");
         return value as string;
     }
 
     static SetConfig(context: Context, config: string) {
-        Hv2rayPreferences.EnsurePreference(context, "core");
-        Hv2rayPreferences.pref!.putSync("config", config);
-        Hv2rayPreferences.pref?.flush();
+        const pref = Hv2rayPreferences.EnsurePreference(context, "core");
+        pref.putSync("config", config);
+        pref.flush();
     }
 }
 
