@@ -4,15 +4,44 @@ import Logger from "../../utils/Logging";
 import fs from '@ohos.file.fs';
 import { ConfigRoot } from "./Config";
 import { IConnection, IGroup, loadFromFile, saveToFile } from "./ConfigCommon";
+import { Ctor } from "../common/SerializableTypes";
+import { ISerializable } from "../common/ISerializable";
+import { Connection } from "./Connection";
+import { WireGuardSettings } from "./WgSettings";
 
 const TAG = 'config/ConfigManager';
 const CONFIG_FILES_PATH_PREFIX = DEBUG ? 'config-debug' : 'config';
 const CONNECTIONS_PATH_DIR = 'connections';
 const CONFIG_FILE = 'groups.json';
+const SETTINGS_FILE = 'settings.json';
 
-interface Hv2rayConfigRoot {
+class Hv2rayConfigRoot extends ISerializable {
     groups: IGroup[];
-    connections: IConnection[];
+    connections: Connection[];
+
+    constructor() {
+        super('Hv2rayConfigRoot');
+        this.groups = [];
+        this.connections = [];
+    }
+
+    protected doSerialize(): object {
+        const obj: object = new Object;
+        obj['groups'] = this.groups;
+        obj['connections'] = this.connections.map(connection => connection.Serialize());
+        return obj;
+    }
+
+    protected doFill(input: object): void {
+        this.groups = input['groups'] as IGroup[];
+        const arrayObj = input['connections'] as object[];
+        for (let i = 0; i < arrayObj.length; i++) {
+            const obj = arrayObj[i] as object;
+            const conn = new Connection();
+            conn.Fill(obj);
+            this.connections.push(conn);
+        }
+    }
 }
 
 function generateRandomString(length: number = 16) {
@@ -28,7 +57,8 @@ function generateRandomString(length: number = 16) {
 export class ConfigManagerImpl {
     private readonly configPathBase: string = '/data/storage/el2/base/files/' + CONFIG_FILES_PATH_PREFIX;
     @Trace private groups: Map<string, IGroup> = new Map();
-    @Trace private connections: Map<string, IConnection> = new Map();
+    @Trace private connections: Map<string, Connection> = new Map();
+    @Trace private wgSettings: WireGuardSettings = new WireGuardSettings();
 
     constructor() {
         try {
@@ -41,6 +71,10 @@ export class ConfigManagerImpl {
 
     public get allGroups() {
         return this.groups;
+    }
+
+    public get wireGuard(): WireGuardSettings {
+        return this.wgSettings;
     }
 
     public getConnection(connId: string): IConnection | undefined {
@@ -66,7 +100,7 @@ export class ConfigManagerImpl {
         this.safeMkdir(this.configPathBase);
         this.safeMkdir(this.connectionsDir);
 
-        let root = await this.loadConfigFromFile<Hv2rayConfigRoot>(CONFIG_FILE);
+        let root = await this.loadConfigFromFile(Hv2rayConfigRoot, CONFIG_FILE);
         if (root) {
             for (let group of root.groups) {
                 this.groups.set(group.id, group);
@@ -75,6 +109,13 @@ export class ConfigManagerImpl {
             for (let connection of root.connections) {
                 this.connections.set(connection.id, connection);
             }
+        }
+
+        // loadFromFile returns a plain object when settings.json is missing or malformed,
+        // in which case the built-in defaults are kept.
+        const wgSettings = await this.loadConfigFromFile(WireGuardSettings, SETTINGS_FILE);
+        if (wgSettings instanceof WireGuardSettings) {
+            this.wgSettings = wgSettings;
         }
 
         this.ensureDefaultGroups();
@@ -111,27 +152,25 @@ export class ConfigManagerImpl {
             return;
         }
 
-        let conn: IConnection = {
-            id: generateRandomString(),
-            name: connectionName,
-        };
-
+        let conn = new Connection();
+        conn.id = generateRandomString();
+        conn.name = connectionName;
         this.connections.set(conn.id, conn);
         group.connections.push(conn.id);
         await this.writeConnectionToFile(conn.id, content);
         await this.saveConfigurations();
     }
 
-    private async loadConfigFromFile<T>(fileName: string): Promise<T | undefined> {
-        return await loadFromFile(this.configPathBase + '/' + fileName);
+    private async loadConfigFromFile<T>(ctor: Ctor<T>, fileName: string): Promise<T | undefined> {
+        return await loadFromFile(ctor, this.configPathBase + '/' + fileName);
     }
 
-    public async writeConfigToFile<T>(t: T, fileName: string): Promise<void> {
-        await saveToFile(t, this.configPathBase + '/' + fileName);
+    public async writeConfigToFile<T>(t: T, fileName: string): Promise<boolean> {
+        return await saveToFile(t, this.configPathBase + '/' + fileName);
     }
 
     public async loadConnectionFromFile(connId: string): Promise<ConfigRoot | undefined> {
-        return await loadFromFile<ConfigRoot>(this.connectionsDir + '/' + connId + '.json');
+        return await loadFromFile(ConfigRoot, this.connectionsDir + '/' + connId + '.json');
     }
 
     private async writeConnectionToFile(connId: string, content: ConfigRoot): Promise<void> {
@@ -140,12 +179,21 @@ export class ConfigManagerImpl {
 
     public async saveConfigurations() {
         Logger.Info(TAG, `saveConfigurations in`)
-        let root: Hv2rayConfigRoot = {
-            groups: Array.from(this.groups.values()),
-            connections: Array.from(this.connections.values()),
-        }
-
+        let root = new Hv2rayConfigRoot();
+        root.groups = Array.from(this.groups.values());
+        root.connections = Array.from(this.connections.values());
         this.writeConfigToFile(root, CONFIG_FILE);
+    }
+
+    public async saveWireGuardSettings(settings: WireGuardSettings): Promise<boolean> {
+        Logger.Info(TAG, `saveWireGuardSettings in`)
+        const written = await this.writeConfigToFile(settings, SETTINGS_FILE);
+        if (!written) {
+            Logger.Error(TAG, `failed to persist ${SETTINGS_FILE}, keeping previous settings`);
+            return false;
+        }
+        this.wgSettings = settings;
+        return true;
     }
 }
 

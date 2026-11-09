@@ -3,9 +3,15 @@ import { KernelEventType } from '../utils/Common';
 import { CommonEventUtils } from '../utils/CommonEventUtils';
 
 export namespace VCoreManager {
-    export function StartVCore(socks5Port: number, config: string): boolean {
+    export interface StartVCoreParams {
+        config: string;
+        statsPort: number;
+        directTag: string;
+        proxyTag: string;
+    }
+    export function StartVCore(params: StartVCoreParams): boolean {
         try {
-            native.startVCore(socks5Port, config);
+            native.startVCore(params.config, params.statsPort, params.directTag, params.proxyTag);
         } catch (e) {
             let errMsg: string[] = [];
             for (let line of (e.message as string)

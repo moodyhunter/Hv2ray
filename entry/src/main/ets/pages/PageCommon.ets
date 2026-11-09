@@ -21,26 +21,36 @@ export function prettyPrintBytes(bytes: number): string {
 
 @ObservedV2
 export class GuiStatObject {
-    @Trace rxRate: number = 0;
-    @Trace txRate: number = 0;
-    @Trace rxTotal: number = 0;
-    @Trace txTotal: number = 0;
+    @Trace proxyUpRate: number = 0;
+    @Trace proxyDownRate: number = 0;
+    @Trace directUpRate: number = 0;
+    @Trace directDownRate: number = 0;
+
+    @Trace proxyUpTotal: number = 0;
+    @Trace proxyDownTotal: number = 0;
+    @Trace directUpTotal: number = 0;
+    @Trace directDownTotal: number = 0;
 
     constructor() {
         CommonEventUtils.subscribeStatsEvent((stat: Stat) => {
-            this.rxRate = stat.rx;
-            this.txRate = stat.tx;
-            this.rxTotal += stat.rx;
-            this.txTotal += stat.tx;
+            this.proxyUpRate = stat.proxyUp;
+            this.proxyDownRate = stat.proxyDown;
+            this.proxyUpTotal += stat.proxyUp;
+            this.proxyDownTotal += stat.proxyDown;
+
+            this.directUpRate = stat.directUp;
+            this.directDownRate = stat.directDown;
+            this.directUpTotal += stat.directUp;
+            this.directDownTotal += stat.directDown;
         });
     }
 
     public get rxRateString() {
-        return prettyPrintBytes(this.rxRate) + '/s';
+        return prettyPrintBytes(this.proxyDownRate) + '/s';
     }
 
     public get txRateString() {
-        return prettyPrintBytes(this.txRate) + '/s';
+        return prettyPrintBytes(this.proxyUpRate) + '/s';
     }
 }
 

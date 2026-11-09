@@ -1,24 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 interface Statistics {
-    tx: number;
-    rx: number;
+    directUp: number;
+    directDown: number;
+    proxyUp: number;
+    proxyDown: number;
 }
 
-/**
- * Start the TUN service.
- */
-declare const startTun: (tunFd: number, socks5Port: number) => void;
-
-/**
- * Stop the TUN service.
- */
-declare const stopTun: () => void;
+type StatisticsEventCallback = (stats: Statistics) => void;
 
 /**
  * Start the VCore service.
  */
-declare const startVCore: (socks5Port: number, config: string) => void;
+declare const startVCore: (config: string, statsPort: number, directTag: string, proxyTag: string) => void;
 
 /**
  * Stop the VCore service.
@@ -28,9 +22,6 @@ declare const stopVCore: () => void;
 /**
  * Register a callback function to receive statistics.
  */
-declare const onStatisticsEvent: (
-    interval: number,
-    callback: (stats: Statistics) => void
-) => void;
+declare const onStatisticsEvent: (callback: StatisticsEventCallback) => void;
 
-export { startTun, stopTun, startVCore, stopVCore, onStatisticsEvent };
+export { startVCore, stopVCore, onStatisticsEvent };

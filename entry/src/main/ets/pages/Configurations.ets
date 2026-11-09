@@ -51,7 +51,11 @@ export struct Configurations {
                     inbounds: [],
                     outbounds: [
                         item.outbound
-                    ]
+                    ],
+                    router: {
+                        domainStrategy: 'IpIfNonMatch',
+                        rule: []
+                    }
                 };
                 ConfigManager.addConnectionToGroup(item.name, 'subscription', configRoot)
             }

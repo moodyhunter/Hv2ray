@@ -1,17 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { AbilityConstant, ConfigurationConstant, UIAbility, Want, wantAgent } from '@kit.AbilityKit';
-import { AppStorageV2, window } from '@kit.ArkUI';
+import { window } from '@kit.ArkUI';
 import { BUNDLE_NAME } from 'BuildProfile';
 import Logger from '../utils/Logging';
 import backgroundTaskManager from '@ohos.resourceschedule.backgroundTaskManager';
-import { ConfigManager, ConfigManagerImpl } from '../core/config/ConfigManager';
+import { ConfigManager } from '../core/config/ConfigManager';
 
 const TAG = "Hv2ray-EntryAbility";
 
 export default class EntryAbility extends UIAbility {
-    async onCreate(_want: Want, launchParam: AbilityConstant.LaunchParam) {
-        this.context.getApplicationContext()
-            .setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
+    async onCreate(_want: Want, _launchParam: AbilityConstant.LaunchParam) {
+        try {
+            this.context.getApplicationContext()
+                .setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
+        } catch (error) {
+            Logger.Error(TAG, `setColorMode failed?`);
+        }
         Logger.Info(TAG, "onCreate");
         await ConfigManager.loadConfigurations();
         await ConfigManager.saveConfigurations();
@@ -56,7 +60,7 @@ export default class EntryAbility extends UIAbility {
         Logger.Info(TAG, `startBackgroundRunning`);
         try {
             const WANT_AGENT_INFO: wantAgent.WantAgentInfo = {
-                wants: [{ bundleName: BUNDLE_NAME, abilityName: "EntryAbility" }],
+                wants: [{ bundleName: BUNDLE_NAME, abilityName: "VpnAbility" }],
                 actionType: wantAgent.OperationType.START_ABILITY,
                 requestCode: 0,
                 wantAgentFlags: [wantAgent.WantAgentFlags.UPDATE_PRESENT_FLAG]
@@ -75,4 +79,3 @@ export default class EntryAbility extends UIAbility {
         }
     }
 }
-

@@ -6,85 +6,94 @@ import native from 'libnative.so';
 import { KernelEventType, Stat } from '../utils/Common';
 import { CommonEventUtils } from '../utils/CommonEventUtils';
 import { BUNDLE_NAME } from 'BuildProfile';
+import { VCoreManager } from './VCoreManager';
+import { fileIo } from '@kit.CoreFileKit';
 
 const TAG = "Hv2ray-VpnAbility";
 const TUN_IP = "198.18.0.1";
 
-interface V2RayVpnParameters {
-    config: string;
-    socks5Port: number;
-    dnsAddresses: string[];
-    whitelist: string[];
-    blacklist: string[];
-}
-
 export class VpnAbility extends VpnExtensionAbility {
-    vpnConnection: vpnExtension.VpnConnection | null = null;
-    socks5Port: number = 51081;
-    kernelCrashed: boolean = false;
+    private vpnConnection: vpnExtension.VpnConnection = null!;
+    private kernelCrashed: boolean = false;
 
-    async onCreate(want: Want) {
-        Logger.Info(TAG, `VpnAbility onCreate`);
-        CommonEventUtils.publishKernelErrorEvent(KernelEventType.Starting);
-        if (this.vpnConnection == null) {
-            this.vpnConnection = vpnExtension.createVpnConnection(this.context);
-        }
-
-        this.socks5Port = (want.parameters?.socks5Port as number | undefined) ?? 51081;
-
-        let config: vpnExtension.VpnConfig = {
-            addresses: [{ address: { address: TUN_IP, family: 1 }, prefixLength: 24 }],
-            dnsAddresses: ['8.8.8.8', '8.8.4.4', '1.1.1.1'],
-            blockedApplications: [BUNDLE_NAME]
-        };
-        let tunFd: number;
-        try {
-            tunFd = await this.vpnConnection.create(config);
-        } catch (error) {
-            Logger.Error(TAG, `failed to create new VpnConnection: ${JSON.stringify(error)}`);
-            CommonEventUtils.publishKernelErrorEvent(KernelEventType.Crashed, [JSON.stringify(error)]);
-            this.kernelCrashed = true;
-            await this.vpnConnection.destroy();
-            return;
-        }
-        if (tunFd < 0) {
-            Logger.Error(TAG, `Failed to create VPN: ${tunFd}`);
-            CommonEventUtils.publishKernelErrorEvent(KernelEventType.Crashed, [`Create VPN failed, ${tunFd}`]);
-            this.kernelCrashed = true;
-            return false;
-        }
-
-        Logger.Info(TAG, `Starting VPN on fd ${tunFd}`);
+    private async doCreateVpn(want: Want): Promise<void> {
+        this.kernelCrashed = false;
 
         try {
-            native.startTun(tunFd, this.socks5Port);
-            native.onStatisticsEvent(1, (stats: Stat) => {
-                CommonEventUtils.publishStatsEvent(stats);
-            });
+            let config: vpnExtension.VpnConfig = {
+                addresses: [{ address: { address: TUN_IP, family: 1 }, prefixLength: 24 }],
+                dnsAddresses: ['1.1.1.1'],
+                blockedApplications: [BUNDLE_NAME]
+            };
+            const tunFd = await this.vpnConnection.create(config);
+            Logger.Info(TAG, `Starting VPN on fd ${tunFd}`);
+
+            this.vpnConnection.protectProcessNet();
+
+            const params: VCoreManager.StartVCoreParams = JSON.parse(want.parameters!['params'] as string);
+            params.config = params.config.replace('<<FDXXX>>', 'fd:' + tunFd.toString());
+
+            if (VCoreManager.StartVCore(params)) {
+                Logger.Warn(TAG, `StartVCore succeeded`);
+                native.onStatisticsEvent((stats: Stat) => {
+                    CommonEventUtils.publishStatsEvent(stats);
+                });
+                CommonEventUtils.publishKernelErrorEvent(KernelEventType.Started);
+            } else {
+                CommonEventUtils.publishKernelErrorEvent(KernelEventType.Crashed);
+                return Promise.reject();
+            }
         } catch (e) {
             Logger.Error(TAG, `Failed to start VPN: ${e.message}`);
             CommonEventUtils.publishKernelErrorEvent(KernelEventType.Crashed, e.message);
-            this.kernelCrashed = true;
-            await vpnExtension.stopVpnExtensionAbility(want);
-            return false;
+            return Promise.reject();
         }
+    }
 
-        Logger.Info(TAG, `Started VPN on ${tunFd}`)
-        CommonEventUtils.publishKernelErrorEvent(KernelEventType.Started);
-        return true;
+    onCreate(want: Want): void {
+        Logger.Info(TAG, `VpnAbility onCreate`);
+        // list files in configuration dir
+        const configFile = this.context.tempDir + '/test.conf';
+        try {
+            Logger.Error(TAG, `accessing file: ${JSON.stringify(configFile)}`);
+            fileIo.openSync(configFile, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE);
+        } catch (e) {
+            Logger.Error(TAG, `failed to access files: ${JSON.stringify(e)}, ${configFile}`);
+        }
+        CommonEventUtils.publishKernelErrorEvent(KernelEventType.Starting);
+        this.vpnConnection = vpnExtension.createVpnConnection(this.context);
+        this.doCreateVpn(want)
+            .catch(() => {
+                this.kernelCrashed = true;
+                this.cleanupVpn();
+            });
+    }
+
+    private async cleanupVpn() {
+        VCoreManager.StopVCore();
+        const want: Want = {
+            bundleName: BUNDLE_NAME,
+            abilityName: 'VpnAbility',
+        };
+        await this.vpnConnection.destroy()
+            .catch(() => {
+                Logger.Error(TAG, `failed to destroy vpnConnection`);
+            });
+        await vpnExtension.stopVpnExtensionAbility(want)
+            .catch(() => {
+                Logger.Error(TAG, `failed to stop VpnAbility`);
+            });
     }
 
     async onDestroy() {
         if (!this.kernelCrashed) {
             CommonEventUtils.publishKernelErrorEvent(KernelEventType.Stopped);
         }
-        native.stopTun()
-        if (this.vpnConnection) {
-            try {
-                await this.vpnConnection.destroy()
-            } catch (error) {
-                Logger.Error(TAG, `failed to destroy vpnConnection: ${JSON.stringify(error)}`);
-            }
+        VCoreManager.StopVCore();
+        try {
+            await this.vpnConnection.destroy()
+        } catch (error) {
+            Logger.Error(TAG, `failed to destroy vpnConnection: ${JSON.stringify(error)}`);
         }
         Logger.Info(TAG, `Stopped VPN`)
     }

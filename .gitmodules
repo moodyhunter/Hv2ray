@@ -1,3 +1,0 @@
-[submodule "entry/src/main/cpp/hev-socks5-tunnel"]
-	path = entry/src/main/cpp/hev-socks5-tunnel
-	url = https://github.com/moodyhunter/hev-socks5-tunnel

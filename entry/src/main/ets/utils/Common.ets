@@ -13,8 +13,10 @@ export interface KernelEvent {
 }
 
 export interface Stat {
-    tx: number;
-    rx: number;
+    directUp: number;
+    directDown: number;
+    proxyUp: number;
+    proxyDown: number;
 }
 
 export class Constants {
@@ -24,17 +26,23 @@ export class Constants {
 
 export class Utils {
     public static base64Decode(input: string): string {
-        // let base64 = new util.Base64Helper();
-        // let decodeResult = base64.decodeSync(input);
-        // let decoder = new util.StringDecoder()
-        // return decoder.write(decodeResult);
+        let base64 = new util.Base64Helper();
+        let decodeResult = base64.decodeSync(input);
+        let decoder = new util.StringDecoder()
+        return decoder.write(decodeResult);
+    }
 
-        let base64: util.Base64Helper = new util.Base64Helper();
-        const stringData: Uint8Array = base64.decodeSync(input);
-        // 先将 Uint8Array 转换为 Buffer，然后使用 toString
-        const buf: buffer.Buffer = buffer.from(stringData);
-        const plainString: string = buf.toString('utf8'); // 使用'utf8'编码
-        return plainString
+    public static isUnsignedDecimal(input: string): boolean {
+        if (input.length === 0) {
+            return false;
+        }
+        for (let i = 0; i < input.length; i++) {
+            const char = input.charAt(i);
+            if (char < '0' || char > '9') {
+                return false;
+            }
+        }
+        return true;
     }
 
 }

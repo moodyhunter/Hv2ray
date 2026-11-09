@@ -6,7 +6,6 @@
   "author": "",
   "license": "",
   "dependencies": {
-    "libnative.so": "file:./src/main/cpp/types/libnative",
-    "libentry.so": "file:./src/main/cpp/types/libentry"
+    "libnative.so": "file:./src/main/cpp/types/libnative"
   }
 }

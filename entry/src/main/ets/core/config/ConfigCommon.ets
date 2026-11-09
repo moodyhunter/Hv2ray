@@ -1,6 +1,8 @@
 import fs from '@ohos.file.fs';
 import Logger from '../../utils/Logging';
 import { util } from '@kit.ArkTS';
+import { ISerializable } from '../common/ISerializable';
+import { Ctor, extendsBase } from '../common/SerializableTypes';
 
 const TAG = 'config/ConfigCommon';
 
@@ -20,7 +22,7 @@ function decodeText(arrayBufer: ArrayBuffer): string {
     return decoder.decodeToString(new Uint8Array(arrayBufer));
 }
 
-export async function loadFromFile<T>(filePath: string): Promise<T | undefined> {
+async function readFullFile(filePath: string): Promise<string | undefined> {
     let buffer: ArrayBuffer;
     try {
         const file = await fs.open(filePath, fs.OpenMode.READ_ONLY);
@@ -41,16 +43,38 @@ export async function loadFromFile<T>(filePath: string): Promise<T | undefined> 
     }
 
     const strContent = decodeText(buffer);
+    return strContent;
+}
+
+export async function loadFromFile<T>(ctor: Ctor<T>, filePath: string): Promise<T | undefined> {
+    const strContent = await readFullFile(filePath);
+    if (!strContent) {
+        return undefined;
+    }
+
     try {
-        return JSON.parse(strContent) as T;
+        if (extendsBase(ISerializable, ctor)) {
+            const input: object = JSON.parse(strContent);
+            const obj: T = new ctor();
+            (obj as ISerializable)
+                .Fill(input);
+            return obj as T;
+        } else {
+            return JSON.parse(strContent) as T;
+        }
     } catch (e) {
         Logger.Error(TAG, `failed to parse JSON`);
         return new Object() as T;
     }
 }
 
-export async function saveToFile<T>(t: T, filePath: string) {
-    let content = JSON.stringify(t, undefined, 2);
+export async function saveToFile<T>(t: T, filePath: string): Promise<boolean> {
+    let content: string;
+    if (t instanceof ISerializable) {
+        content = JSON.stringify(t.Serialize(), undefined, 2);
+    } else {
+        content = JSON.stringify(t, undefined, 2);
+    }
     try {
         const file = await fs.open(filePath, fs.OpenMode.WRITE_ONLY | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
         await fs.write(file.fd, content);
@@ -60,6 +84,7 @@ export async function saveToFile<T>(t: T, filePath: string) {
             });
     } catch (error) {
         Logger.Error(TAG, `failed to write to file: ${JSON.stringify(error)}`);
-        return;
+        return false;
     }
+    return true;
 }

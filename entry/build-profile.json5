@@ -5,9 +5,7 @@
       "path": "./src/main/cpp/CMakeLists.txt",
       "abiFilters": [
         "arm64-v8a"
-      ],
-      "arguments": "",
-      "cppFlags": ""
+      ]
     }
   },
   "buildOptionSet": [
@@ -25,8 +23,7 @@
       },
       "nativeLib": {
         "debugSymbol": {
-          "strip": true,
-          "exclude": []
+          "strip": true
         }
       }
     }

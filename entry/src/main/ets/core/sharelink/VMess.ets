@@ -82,6 +82,10 @@ export class VMessShareLinkImporter implements IShareLinkImporter {
         }
 
         const stream = this.doDecodeStream(linkObject);
+        if (!stream) {
+            Logger.Error(TAG, `failed to decode stream settings`);
+            return undefined;
+        }
 
         const vmessSettings: Record<string, JsonValue> = {
             'address': linkObject.add,
@@ -99,11 +103,11 @@ export class VMessShareLinkImporter implements IShareLinkImporter {
         return { name: linkObject.ps, outbound: outbound };
     }
 
-    private doDecodeStream(linkObject: ILegacyVMessLink): StreamObject {
+    private doDecodeStream(linkObject: ILegacyVMessLink): StreamObject | undefined {
         const decoder = VMessShareLinkImporter.TRANSPORT_DECODER_MAP[linkObject.net];
         if (!decoder) {
             Logger.Error(TAG, `unsupported transport: ${linkObject.net}`);
-            return new StreamObject();
+            return undefined;
         }
 
         if (linkObject.net === 'h2') {
@@ -111,21 +115,25 @@ export class VMessShareLinkImporter implements IShareLinkImporter {
             linkObject.net = 'http';
         }
 
-        const stream = new StreamObject();
-        stream.transport = linkObject.net;
-        stream.transportSettings = decoder(linkObject);
+        const stream: StreamObject = {
+            transport: linkObject.net,
+            transportSettings: decoder(linkObject),
+            security: linkObject.tls,
+        };
 
         if (linkObject.tls === 'tls') {
-            stream.security = 'tls';
             if (!linkObject.sni && linkObject.host) {
                 linkObject.sni = linkObject.host;
             }
-            stream.securitySettings['serverName'] = linkObject.sni;
+            stream.securitySettings = {
+                'serverName': linkObject.sni
+            };
         }
         return stream;
     }
 
-    private tryParseVMessLink(link: string): ILegacyVMessLink | undefined {
+    private tryParseVMessLink(link: string)
+        : ILegacyVMessLink | undefined {
         const mainPart = link.substring('vmess://'.length);
         for (let i = 0; i <= 3; i++) {
             try {

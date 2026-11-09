@@ -1,17 +1,75 @@
 import { vpnExtension } from '@kit.NetworkKit';
 import { KernelEvent, KernelEventType } from '../utils/Common';
-import Logger from '../utils/Logging';
-import { Want } from '@kit.AbilityKit';
-import { BUNDLE_NAME } from 'BuildProfile';
 import fs from '@ohos.file.fs';
-import Hv2rayPreferences from '../utils/Preferences';
 import { CommonEventUtils } from '../utils/CommonEventUtils';
 import { GlobalStat, prettyPrintBytes } from './PageCommon'
 import { VCoreManager } from '../vpn/VCoreManager';
 import { IConnection, IGroup } from '../core/config/ConfigCommon';
 import { ConfigManager } from '../core/config/ConfigManager';
-import { ConfigRoot, Inbound } from '../core/config/Config';
+import { ConfigRoot } from '../core/config/Config';
+import Logger from '../utils/Logging';
+import { Want } from '@kit.AbilityKit';
+import { BUNDLE_NAME } from 'BuildProfile';
+import { ConfigurationBuilder } from '../core/config/Generation';
+import { FilterList, FilterOption, LayoutType, ResultItem } from 'module_filter_list';
 
+
+@ComponentV2
+struct IndexAAA {
+    types: string[] = ['一居室', '两居室', '三居室', '四居室'];
+    styles: string[] = ['原木风', '简约风', '新中式', '奶油风', '原木风', '简约风', '新中式'];
+    @Local typeIndex: number = 0;
+    @Local styleIndex: number = 0;
+    @Local listArr: string[] = [];
+    @Local filterOptions: FilterOption[] = [
+        new FilterOption('房屋户型', this.typeIndex, this.types),
+        new FilterOption('房屋风格', this.styleIndex, this.styles),
+    ];
+
+    private onFilterListChange(res: ResultItem[]) {
+        while (this.listArr.length > 0) {
+            this.listArr.pop();
+        }
+        Logger.Error(TAG, `!!!!! ${JSON.stringify(res)}`);
+        for (const r of res) {
+            this.listArr.push(`${r.filterName} - ${r.selectIndex}`);
+        }
+    }
+
+    build() {
+        Column() {
+            FilterList(
+                {
+                    filterOptions: this.filterOptions,
+                    layoutStyle: LayoutType.SPLIT,
+                    onChange: (res: ResultItem[]) => {
+                        this.onFilterListChange(res);
+                    },
+                },
+            ) {
+                List({ space: 12 }) {
+                    ForEach(this.listArr, (item: string, _index: number) => {
+                        ListItem() {
+                            Column({ space: 12 }) {
+                                Image($r('app.media.app_icon'))
+                                    .width('100%')
+                                    .height(140)
+                                    .borderRadius(16)
+                                    .draggable(false)
+
+                                Text(item)
+                            }
+                        }
+                    })
+                }
+                .width('100%')
+                .height('100%')
+                .padding({ top: 12, right: 16, left: 16 })
+                .layoutWeight(1)
+            }
+        }
+    }
+}
 
 const TAG = "Hv2ray-HomePage"
 
@@ -25,7 +83,7 @@ struct SpeedStatsRow {
         Row() {
             Text(this.message)
                 .fontSize(20)
-                .width(150)
+                .width(200)
                 .fontWeight(FontWeight.Bold)
 
             Text(prettyPrintBytes(this.value) + this.suffix)
@@ -40,22 +98,22 @@ struct SpeedStatsRow {
 
 @ObservedV2
 class ConnectionInfo {
-    private readonly connId: string;
     public readonly config: ConfigRoot;
     @Trace connectionName: string;
-    @Trace remoteHost: string;
-    @Trace remotePort: number;
-    @Trace protocol: string;
-    @Trace transport: string;
+    @Trace remoteHost: string = 'Unknown';
+    @Trace remotePort: number = 0;
+    @Trace protocol: string = 'unknown';
+    @Trace transport: string = 'unknown';
 
     constructor(connId: string, root: ConfigRoot) {
-        this.connId = connId;
         this.config = root;
         this.connectionName = ConfigManager.getConnection(connId)?.name ?? "<invalid>";
-        this.remoteHost = root.outbounds[0].settings['address'] as string;
-        this.remotePort = root.outbounds[0].settings['port'] as number;
-        this.protocol = root.outbounds[0].protocol;
-        this.transport = root.outbounds[0].streamSettings.transport;
+        if (root.outbounds && root.outbounds.length > 0) {
+            this.remoteHost = root.outbounds[0].settings['address'] as string;
+            this.remotePort = root.outbounds[0].settings['port'] as number;
+            this.protocol = root.outbounds[0].protocol;
+            this.transport = root.outbounds[0].streamSettings?.transport ?? '<unknown>';
+        }
     }
 
     static async getConnectionInfo(connId: string): Promise<ConnectionInfo> {
@@ -63,7 +121,6 @@ class ConnectionInfo {
         return new ConnectionInfo(connId, root);
     }
 }
-
 
 @ComponentV2
 export struct Home {
@@ -89,10 +146,11 @@ export struct Home {
         CommonEventUtils.subscribeKernelEvent(async (kernelEvent: KernelEvent) => {
             this.kernelStatus = kernelEvent.type;
             if (kernelEvent.type === KernelEventType.Crashed) {
+                await this.doStopKernel();
                 await this.getUIContext()
                     .getPromptAction()
                     .showDialog({
-                        message: kernelEvent.message.join('\n')
+                        message: kernelEvent.message.join('\n') ?? 'failed'
                     })     
                     .catch(() => {
                         Logger.Error(TAG, `show dialog failed!`);
@@ -101,26 +159,21 @@ export struct Home {
         });
     }
 
-    private getCurrentConfig(port: number): string {
+    private getCurrentConfig(): string {
         if (!this.connectionInfo) {
             return '';
         }
-        const configRoot: ConfigRoot = JSON.parse(JSON.stringify(this.connectionInfo.config));
-        const socks5Inbound: Inbound = {
-            listen: '127.0.0.1',
-            port: port.toString(),
-            settings: {
-                'udpEnabled': true,
-            },
-            protocol: 'socks',
-            tag: 'default-inbound',
-            sniffing: undefined,
-        };
-        configRoot.inbounds.push(socks5Inbound);
 
-        const configRootObject = configRoot as object as Record<string, object>;
-
-        return JSON.stringify(configRootObject);
+        const TUNFD_PLACEHOLDER = "<<FDXXX>>";
+        const generator = new ConfigurationBuilder(this.connectionInfo.config);
+        generator.addStatsApi();
+        generator.addHttpInbound();
+        generator.addTunInbound(TUNFD_PLACEHOLDER);
+        generator.addFreedomOutbound(!this.isFullVpn);
+        generator.addRules();
+        generator.addWireguard(ConfigManager.wireGuard);
+        const final = generator.build();
+        return JSON.stringify(final);
     }
 
     private async doStartKernel(): Promise<void> {
@@ -162,19 +215,19 @@ export struct Home {
                 });
         }
 
-        const socks5Port = Hv2rayPreferences.GetSocks5Port(context);
+        let params: VCoreManager.StartVCoreParams = {
+            config: this.getCurrentConfig(),
+            statsPort: 18888,
+            directTag: 'direct',
+            proxyTag: 'outbound',
+        }
         let want: Want = {
             bundleName: BUNDLE_NAME,
             abilityName: 'VpnAbility',
             parameters: {
-                'socks5Port': socks5Port,
+                'params': JSON.stringify(params),
             }
         };
-
-        const ret = VCoreManager.StartVCore(socks5Port, this.getCurrentConfig(socks5Port));
-        if (!ret) {
-            return;
-        }
 
         try {
             await vpnExtension.startVpnExtensionAbility(want);
@@ -187,10 +240,14 @@ export struct Home {
     @Builder
     speedStats() {
         Column({ space: 10 }) {
-            SpeedStatsRow({ message: 'Upload', value: GlobalStat.txRate, suffix: '/s' })
-            SpeedStatsRow({ message: 'Download', value: GlobalStat.rxRate, suffix: '/s' })
-            SpeedStatsRow({ message: 'Total Upload', value: GlobalStat.txTotal })
-            SpeedStatsRow({ message: 'Total Download', value: GlobalStat.rxTotal })
+            SpeedStatsRow({ message: 'Proxy: Upload', value: GlobalStat.proxyUpRate, suffix: '/s' })
+            SpeedStatsRow({ message: 'Proxy: Download', value: GlobalStat.proxyDownRate, suffix: '/s' })
+
+            SpeedStatsRow({ message: 'Direct: Upload', value: GlobalStat.directUpRate, suffix: '/s' })
+            SpeedStatsRow({ message: 'Direct: Download', value: GlobalStat.directDownRate, suffix: '/s' })
+
+            SpeedStatsRow({ message: 'Total Upload', value: GlobalStat.proxyUpTotal })
+            SpeedStatsRow({ message: 'Total Download', value: GlobalStat.proxyDownTotal })
         }
     }
 
@@ -212,9 +269,21 @@ export struct Home {
         }
     }
 
+    @Local private isFullVpn: boolean = false;
+
     @Builder
     controlButtons() {
         Row({ space: 30 }) {
+            Button(this.isFullVpn ? 'Full' : 'WG Only')
+                .fontSize(18)
+                .fontWeight(FontWeight.Bold)
+                .backgroundColor(this.isFullVpn ? Color.Green : Color.Blue)
+                .padding(20)
+                .width(150)
+                .onClick(async () => {
+                    this.isFullVpn = !this.isFullVpn;
+                })
+
             Button(this.kernelStatus === KernelEventType.Started ? 'Restart' : 'Start')
                 .fontSize(30)
                 .fontWeight(FontWeight.Bold)
@@ -224,7 +293,6 @@ export struct Home {
                 .onClick(async () => {
                     Logger.Info(TAG, `onStart`);
                     const currentStatus = this.kernelStatus;
-                    VCoreManager.StopVCore();
                     await vpnExtension.stopVpnExtensionAbility({
                         bundleName: BUNDLE_NAME,
                         abilityName: 'VpnAbility',
@@ -251,26 +319,32 @@ export struct Home {
                     .padding(20)
                     .width(150)
                     .onClick(async () => {
-                        try {
-                            await vpnExtension.stopVpnExtensionAbility({
-                                bundleName: BUNDLE_NAME,
-                                abilityName: 'VpnAbility',
-                            });
-                        } catch (error) {
-                            Logger.Error(TAG, `failed to stop VpnAbility: ${JSON.stringify(error)}`);
-                        }
+                        await this.doStopKernel();
                     })
             }
         }
     }
 
+    private async doStopKernel() {
+        VCoreManager.StopVCore();
+        try {
+            await vpnExtension.stopVpnExtensionAbility({
+                bundleName: BUNDLE_NAME,
+                abilityName: 'VpnAbility',
+            });
+        } catch (error) {
+            Logger.Error(TAG, `failed to stop VpnAbility: ${JSON.stringify(error)}`);
+        }
+    }
+
     @Builder
     selectedConnectionInfo() {
-        Column() {
+        Column({ space: 8 }) {
             if (this.connectionInfo) {
                 Text(this.connectionInfo.connectionName)
                     .fontSize(30)
                     .fontWeight(FontWeight.Bold)
+                    .margin({ bottom: 12 })
                 Text(this.connectionInfo.remoteHost + ':' + this.connectionInfo.remotePort)
                     .fontWeight(FontWeight.Bold)
                 Text(this.connectionInfo.protocol + '/' + this.connectionInfo.transport)
@@ -351,6 +425,12 @@ export struct Home {
                             this.groupItem(group);
                         }
                     }, (group: IGroup) => group.id)
+
+                    ListItem() {
+                        IndexAAA()
+                            .width('100%')
+                    }
+                    .width('100%')
                 }
                 .backgroundColor($r('sys.color.gray_02'))
                 .padding(8)
@@ -365,8 +445,8 @@ export struct Home {
                 .width('100%')
                 .position({ bottom: '20vp' })
             } 
-            .width(350)
-            .constraintSize({ minWidth: 300 })
+            .width(300)
+            // .constraintSize({ minWidth: 300 })
             .height('100%')
 
             Column({ space: 40 }) {

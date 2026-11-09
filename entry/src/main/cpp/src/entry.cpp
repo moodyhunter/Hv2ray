@@ -2,55 +2,35 @@
 
 #include "Logging.hpp"
 #include "NapiUtils.hpp"
-#include "TunManager.hpp"
 #include "VCoreManager.hpp"
 
 #include <node_api.h>
-#include <unistd.h>
-
-static napi_value NAPI_Global_startTun(napi_env env, napi_callback_info info)
-{
-    const auto input = NapiArgs<napi_number, napi_number>::Get(env, info);
-    if (!input.has_value())
-        return nullptr;
-
-    const auto [tunFd, socksPort] = *input;
-    TunManager::Instance().StartTun(tunFd, socksPort);
-
-    return nullptr;
-}
-
-static napi_value NAPI_Global_stopTun(napi_env env, napi_callback_info info)
-{
-    const auto input = NapiArgs<>::Get(env, info);
-    if (!input.has_value())
-        return nullptr;
-
-    TunManager::Instance().StopTun();
-
-    return nullptr;
-}
 
 static napi_value NAPI_Global_onStatisticsEvent(napi_env env, napi_callback_info info)
 {
-    const auto input = NapiArgs<napi_number, napi_function>::Get(env, info);
+    const auto input = NapiArgs<napi_function>::Get(env, info);
     if (!input.has_value())
         return nullptr;
 
-    const auto [interval, callback] = input.value();
-    TunManager::Instance().RegisterStatisticsCallback(env, callback, interval);
-
+    const auto [callback] = input.value();
+    VCoreManager::Instance().RegisterStatisticsCallback(env, callback);
     return nullptr;
 }
 
 static napi_value NAPI_Global_startVCore(napi_env env, napi_callback_info info)
 {
-    const auto input = NapiArgs<napi_number, napi_string>::Get(env, info);
+    const auto input = NapiArgs<napi_string, napi_number, napi_string, napi_string>::Get(env, info);
     if (!input.has_value())
         return nullptr;
 
-    const auto [socks5Port, config_string] = *input;
-    const auto err = VCoreManager::Instance().StartVCore(config_string);
+    const auto [config, statsPort, directTag, proxyTag] = *input;
+    const StartVCoreParams params = {
+        .configuration = config,
+        .proxyTag = proxyTag,
+        .directTag = directTag,
+        .statsPort = statsPort,
+    };
+    const auto err = VCoreManager::Instance().StartVCore(params);
     if (err.has_value())
     {
         napi_throw_error(env, nullptr, err.value().c_str());
@@ -75,11 +55,7 @@ static napi_value InitNativeModule(napi_env env, napi_value exports)
     napi_property_descriptor desc[] = {
         // onStatisticsEvent: (callback: (stats: Statistics) => void) => void
         { "onStatisticsEvent", nullptr, NAPI_Global_onStatisticsEvent, nullptr, nullptr, nullptr, napi_default, nullptr },
-        // startTun: (tunFd: number) => void
-        { "startTun", nullptr, NAPI_Global_startTun, nullptr, nullptr, nullptr, napi_default, nullptr },
-        // stopTun: () => void
-        { "stopTun", nullptr, NAPI_Global_stopTun, nullptr, nullptr, nullptr, napi_default, nullptr },
-        // startVCore: (socks5Port: number) => void
+        // startVCore: () => void
         { "startVCore", nullptr, NAPI_Global_startVCore, nullptr, nullptr, nullptr, napi_default, nullptr },
         // stopVCore: () => void
         { "stopVCore", nullptr, NAPI_Global_stopVCore, nullptr, nullptr, nullptr, napi_default, nullptr },
