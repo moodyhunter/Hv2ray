@@ -120,6 +120,13 @@
 
 `renderBackupConfigFiles(snapshot)` 摊平成一组相对路径 + 文本；`collectBackupSnapshot(files)` 是反向。两者共用同一份 `snapshot` 形状：`groups.json` 的顶层就是 `{ groups, connections }` 这一层，信封里的 `snapshot` 也是这一层加 `settings`，所以解析函数只有一个（`parseSnapshotParts`）。
 
+连接配置有**两个存放位置**，采信规则按来源区分，这点必须记牢：
+
+| 来源 | 连接配置从哪读 |
+| --- | --- |
+| 备份文件（信封） | `snapshot.connections[].config` 内联。`decodeBackupEnvelope` 会把它读出来，还原时 `renderBackupConfigFiles` 据此写回 `connections/<id>.json`。**这一步漏了，还原后就只剩 groups.json + settings.json，所有连接都读不到配置。** |
+| 配置目录 | 以 `connections/<id>.json` 独立文件为准。`groups.json` 里上一次还原残留的内联 `config` 不采信：找不到独立文件时清空它并报 `missing_connection_config`。 |
+
 上面那份快照渲染出的文件：
 
 ```
@@ -165,7 +172,7 @@ connections/aB3xK9qL.json
 
 两点需要知道：
 
-- 写回的 `groups.json` 里每个连接会**多带一份 `config`**（`IBackupConnection` 的完整形状）。这不影响正确性：`Connection.Fill()` 只读 `id` / `name` / `metadata`，真正的配置仍从 `connections/<id>.json` 读；下一次 `saveConfigurations()` 会把它去掉。反过来 `collectBackupSnapshot()` 不读 `groups.json` 里的 `config`，只按 id 去挂对应的独立文件，所以两个方向都稳定。
+- 写回的 `groups.json` 里每个连接会**多带一份 `config`**（`IBackupConnection` 的完整形状）。这不影响正确性：`Connection.Fill()` 只读 `id` / `name` / `metadata`，运行期仍从 `connections/<id>.json` 读，而且下一次 `saveConfigurations()` 会把内联的那份去掉。`collectBackupSnapshot()` 也只把它当缓存：独立文件在就用独立文件覆盖，独立文件不在就清空它并报 `missing_connection_config`，所以两个方向都稳定。
 - `config` 缺失的连接不会生成 `connections/*.json`，只留一条 `missing_connection_config` 提醒。
 
 ### 3.3 备份文件名

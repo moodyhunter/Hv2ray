@@ -85,6 +85,7 @@ function joinPath(dir: string, name: string): string {
     return dir + '/' + name;
 }
 
+/** 只有确认这里真的是目录才开始写文件，否则一个同名普通文件会让写出一半的配置。 */
 function safeMkdir(dir: string): boolean {
     try {
         fs.mkdirSync(dir, true);
@@ -94,7 +95,16 @@ function safeMkdir(dir: string): boolean {
             return false;
         }
     }
-    return true;
+    try {
+        if (fs.statSync(dir).isDirectory()) {
+            return true;
+        }
+    } catch (error) {
+        Logger.Error(TAG, `cannot stat ${dir}: ${JSON.stringify(error)}`);
+        return false;
+    }
+    Logger.Error(TAG, `${dir} exists but is not a directory`);
+    return false;
 }
 
 /** 目录不存在时按空列表处理，其它错误记日志。 */

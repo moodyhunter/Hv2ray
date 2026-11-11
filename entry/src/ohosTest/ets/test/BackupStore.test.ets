@@ -227,14 +227,27 @@ export default function backupStoreTest() {
             async (done: Function): Promise<void> => {
                 await resetScratch();
                 await seedConfigDir();
-
-                // connections/ 是文件而不是目录，写不进去，所以原来的 groups.json 必须还在。
                 await writeConsolidatedBackup(scratchDir);
+
+                // 把 connections/ 换成同名的普通文件：连接配置放不下。
+                await fs.rmdir(pathOf(CONNECTIONS_DIR));
                 await writeFixture(CONNECTIONS_DIR, 'not a directory');
+                // 先确认前提真的成立，否则下面的断言会因为别的原因通过。
+                expect(fs.statSync(pathOf(CONNECTIONS_DIR)).isFile()).assertTrue();
+                const groupsBefore = await readFullFile(pathOf(GROUPS_FILE));
+                expect(groupsBefore !== undefined).assertTrue();
+
                 const outcome = await restoreSystemBackup(scratchDir, OLD_APP);
                 expect(outcome.plan.action).assertEqual(BackupRestoreAction.Repair);
                 expect(outcome.applied).assertFalse();
-                expect(exists(GROUPS_FILE)).assertTrue();
+                // 放不下就不写：一份配置也不该被换掉。
+                const groupsAfter = await readFullFile(pathOf(GROUPS_FILE));
+                if (groupsBefore === undefined || groupsAfter === undefined) {
+                    done();
+                    return;
+                }
+                expect(groupsAfter).assertEqual(groupsBefore);
+                expect(fs.statSync(pathOf(CONNECTIONS_DIR)).isFile()).assertTrue();
                 done();
             });
 

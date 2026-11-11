@@ -112,6 +112,30 @@ export default function backupModelTest() {
             expect(metadata['subscription']).assertEqual('https://example.test/sub');
             const settings = envelope.snapshot.settings as Record<string, number>;
             expect(settings['mtu']).assertEqual(1420);
+            // 连接配置内联在 connections[] 里，解码后必须还在，
+            // 否则还原时 renderBackupConfigFiles 会一份连接配置都不写。
+            const config = envelope.snapshot.connections[0].config;
+            expect(config !== undefined).assertTrue();
+            if (config !== undefined) {
+                expect((config as Record<string, string>)['remarks']).assertEqual('node-a');
+            }
+        });
+
+        it('writes_the_connection_files_back_from_a_decoded_backup', TestType.FUNCTION, (): void => {
+            const decoded = decodeBackupEnvelope(encodedSample());
+            if (decoded.envelope === undefined) {
+                return;
+            }
+            const files = renderBackupConfigFiles(decoded.envelope.snapshot);
+
+            let rendered = '';
+            for (const file of files) {
+                if (file.path === connectionConfigPath('c1')) {
+                    rendered = file.content;
+                }
+            }
+            expect(rendered.length > 0).assertTrue();
+            expect((JSON.parse(rendered) as Record<string, string>)['remarks']).assertEqual('node-a');
         });
 
         it('rejects_empty_and_broken_json', TestType.FUNCTION, (): void => {
@@ -325,6 +349,21 @@ export default function backupModelTest() {
                         '[{ "id": "c1", "name": "node-a" }]')
                 },
                 { path: connectionConfigPath('c1'), content: 'garbage' }
+            ]);
+
+            expect(hasIssueCode(collected.issues, BackupIssueCode.MissingConnectionConfig)).assertTrue();
+            expect(collected.snapshot.connections[0].config === undefined).assertTrue();
+        });
+
+        it('ignores_an_inline_config_left_in_the_groups_file', TestType.FUNCTION, (): void => {
+            // 上一次还原会在 groups.json 里内联一份 config；独立文件不在就不能拿它当真。
+            const collected = collectBackupSnapshot([
+                {
+                    path: GROUPS_FILE,
+                    content: '{ "groups": [{ "id": "a", "name": "A", "connections": ["c1"] }],' +
+                        ' "connections": [{ "id": "c1", "name": "node-a", "metadata": {},' +
+                        '   "config": { "remarks": "left over from a restore" } }] }'
+                }
             ]);
 
             expect(hasIssueCode(collected.issues, BackupIssueCode.MissingConnectionConfig)).assertTrue();

@@ -285,11 +285,18 @@ export function parseSnapshotParts(raw: object, issues: IBackupIssue[]): IBackup
             }
             seenConnections.set(id, true);
             const metadataRaw = asField(item, 'metadata');
-            snapshot.connections.push({
+            const configRaw = asField(item, 'config');
+            const connection: IBackupConnection = {
                 id: id,
                 name: readStringField(item, 'name'),
                 metadata: typeof metadataRaw === 'object' ? metadataRaw as object : new Object()
-            });
+            };
+            // 备份信封把连接配置内联在这里；配置目录里它另存一份独立文件，
+            // 由 collectBackupSnapshot 覆盖，不认 groups.json 里的那份残留。
+            if (typeof configRaw === 'object') {
+                connection.config = configRaw as object;
+            }
+            snapshot.connections.push(connection);
         }
     }
 
@@ -378,6 +385,8 @@ export function collectBackupSnapshot(files: IBackupFileEntry[]): IBackupCollect
     for (const connection of snapshot.connections) {
         const configFile = findFileEntry(files, connectionConfigPath(connection.id));
         if (configFile === undefined) {
+            // groups.json 里可能留着上一次还原写进去的内联 config，独立文件不在就当没有。
+            connection.config = undefined;
             issues.push(makeBackupIssue(BackupIssueCode.MissingConnectionConfig,
                 `connection ${connection.id} has no configuration file`, false));
             continue;
@@ -385,6 +394,7 @@ export function collectBackupSnapshot(files: IBackupFileEntry[]): IBackupCollect
         try {
             connection.config = JSON.parse(configFile.content) as object;
         } catch (error) {
+            connection.config = undefined;
             issues.push(makeBackupIssue(BackupIssueCode.MissingConnectionConfig,
                 `the configuration file of ${connection.id} is not valid JSON`, false));
         }
