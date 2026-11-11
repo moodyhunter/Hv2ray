@@ -40,12 +40,14 @@ export class VpnAbility extends VpnExtensionAbility {
                 });
                 CommonEventUtils.publishKernelErrorEvent(KernelEventType.Started);
             } else {
-                CommonEventUtils.publishKernelErrorEvent(KernelEventType.Crashed);
+                // 内核自己的错误内容由 StartVCore 作为 Crashed 事件发出去了。这里不能再补
+                // 一发不带 message 的事件：Home 页会为每个 Crashed 弹一个对话框，那条空的
+                // 就是"弹窗没有内容"。
                 return Promise.reject();
             }
         } catch (e) {
             Logger.Error(TAG, `Failed to start VPN: ${e.message}`);
-            CommonEventUtils.publishKernelErrorEvent(KernelEventType.Crashed, e.message);
+            CommonEventUtils.publishKernelErrorEvent(KernelEventType.Crashed, [`Failed to start VPN: ${e.message}`]);
             return Promise.reject();
         }
     }

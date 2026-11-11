@@ -63,10 +63,18 @@ export struct Home {
         CommonEventUtils.subscribeKernelEvent(async (kernelEvent: KernelEvent) => {
             if (kernelEvent.type === KernelEventType.Crashed) {
                 await stopKernel();
+                // message 是分段后的错误内容，一段一行。内核没有给出任何一段时不能弹一个
+                // 没有内容的对话框，这种情况也要说明失败本身。
+                const detail = kernelEvent.message
+                    .filter((line: string): boolean => line.length > 0)
+                    .join('\n');
+                const content: ResourceStr = detail.length > 0
+                    ? detail
+                    : $r('app.string.err_kernel_start_failed');
                 await this.getUIContext()
                     .getPromptAction()
                     .showDialog({
-                        message: kernelEvent.message.join('\n') ?? 'failed'
+                        message: content
                     })
                     .catch(() => {
                         Logger.Error(TAG, `show dialog failed!`);
