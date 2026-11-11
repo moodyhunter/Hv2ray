@@ -16,15 +16,46 @@ import { FilterList, FilterOption, LayoutType, ResultItem } from 'module_filter_
 
 @ComponentV2
 struct IndexAAA {
-    types: string[] = ['一居室', '两居室', '三居室', '四居室'];
-    styles: string[] = ['原木风', '简约风', '新中式', '奶油风', '原木风', '简约风', '新中式'];
+    types: string[] = [];
+    styles: string[] = [];
     @Local typeIndex: number = 0;
     @Local styleIndex: number = 0;
     @Local listArr: string[] = [];
-    @Local filterOptions: FilterOption[] = [
-        new FilterOption('房屋户型', this.typeIndex, this.types),
-        new FilterOption('房屋风格', this.styleIndex, this.styles),
-    ];
+    @Local filterOptions: FilterOption[] = [];
+
+    private resText(name: Resource): string {
+        try {
+            return this.getUIContext()
+                .getHostContext()!
+                .resourceManager
+                .getStringSync(name.id);
+        } catch (error) {
+            Logger.Error(TAG, `failed to load resource ${name.id}: ${JSON.stringify(error)}`);
+            return '';
+        }
+    }
+
+    aboutToAppear(): void {
+        this.types = [
+            this.resText($r('app.string.demo_room_1bed')),
+            this.resText($r('app.string.demo_room_2bed')),
+            this.resText($r('app.string.demo_room_3bed')),
+            this.resText($r('app.string.demo_room_4bed')),
+        ];
+        this.styles = [
+            this.resText($r('app.string.demo_style_wood')),
+            this.resText($r('app.string.demo_style_minimal')),
+            this.resText($r('app.string.demo_style_new_chinese')),
+            this.resText($r('app.string.demo_style_cream')),
+            this.resText($r('app.string.demo_style_wood')),
+            this.resText($r('app.string.demo_style_minimal')),
+            this.resText($r('app.string.demo_style_new_chinese')),
+        ];
+        this.filterOptions = [
+            new FilterOption(this.resText($r('app.string.demo_filter_room_type')), this.typeIndex, this.types),
+            new FilterOption(this.resText($r('app.string.demo_filter_style')), this.styleIndex, this.styles),
+        ];
+    }
 
     private onFilterListChange(res: ResultItem[]) {
         while (this.listArr.length > 0) {
@@ -75,7 +106,7 @@ const TAG = "Hv2ray-HomePage"
 
 @ComponentV2
 struct SpeedStatsRow {
-    @Require @Param message: string;
+    @Require @Param message: ResourceStr;
     @Require @Param value: number;
     @Param suffix: string = '';
 
@@ -139,6 +170,15 @@ export struct Home {
             case KernelEventType.Started: return Color.Green;
             case KernelEventType.Crashed: return Color.Red;
             case KernelEventType.Stopped: return Color.Blue;
+        }
+    }
+
+    private get kernelStatusLabel(): Resource {
+        switch (this.kernelStatus) {
+            case KernelEventType.Starting: return $r('app.string.status_starting');
+            case KernelEventType.Started: return $r('app.string.status_started');
+            case KernelEventType.Crashed: return $r('app.string.status_crashed');
+            case KernelEventType.Stopped: return $r('app.string.status_stopped');
         }
     }
 
@@ -240,14 +280,14 @@ export struct Home {
     @Builder
     speedStats() {
         Column({ space: 10 }) {
-            SpeedStatsRow({ message: 'Proxy: Upload', value: GlobalStat.proxyUpRate, suffix: '/s' })
-            SpeedStatsRow({ message: 'Proxy: Download', value: GlobalStat.proxyDownRate, suffix: '/s' })
+            SpeedStatsRow({ message: $r('app.string.stat_proxy_up'), value: GlobalStat.proxyUpRate, suffix: '/s' })
+            SpeedStatsRow({ message: $r('app.string.stat_proxy_down'), value: GlobalStat.proxyDownRate, suffix: '/s' })
 
-            SpeedStatsRow({ message: 'Direct: Upload', value: GlobalStat.directUpRate, suffix: '/s' })
-            SpeedStatsRow({ message: 'Direct: Download', value: GlobalStat.directDownRate, suffix: '/s' })
+            SpeedStatsRow({ message: $r('app.string.stat_direct_up'), value: GlobalStat.directUpRate, suffix: '/s' })
+            SpeedStatsRow({ message: $r('app.string.stat_direct_down'), value: GlobalStat.directDownRate, suffix: '/s' })
 
-            SpeedStatsRow({ message: 'Total Upload', value: GlobalStat.proxyUpTotal })
-            SpeedStatsRow({ message: 'Total Download', value: GlobalStat.proxyDownTotal })
+            SpeedStatsRow({ message: $r('app.string.stat_total_up'), value: GlobalStat.proxyUpTotal })
+            SpeedStatsRow({ message: $r('app.string.stat_total_down'), value: GlobalStat.proxyDownTotal })
         }
     }
 
@@ -263,7 +303,7 @@ export struct Home {
     statusComponent() {
         Row({ space: 32 }) {
             this.kernelStatusIcon()
-            Text(KernelEventType[this.kernelStatus])
+            Text(this.kernelStatusLabel)
                 .fontSize(40)
                 .fontWeight(FontWeight.Bold)
         }
@@ -274,7 +314,7 @@ export struct Home {
     @Builder
     controlButtons() {
         Row({ space: 30 }) {
-            Button(this.isFullVpn ? 'Full' : 'WG Only')
+            Button(this.isFullVpn ? $r('app.string.btn_full_vpn') : $r('app.string.btn_wg_only'))
                 .fontSize(18)
                 .fontWeight(FontWeight.Bold)
                 .backgroundColor(this.isFullVpn ? Color.Green : Color.Blue)
@@ -284,7 +324,7 @@ export struct Home {
                     this.isFullVpn = !this.isFullVpn;
                 })
 
-            Button(this.kernelStatus === KernelEventType.Started ? 'Restart' : 'Start')
+            Button(this.kernelStatus === KernelEventType.Started ? $r('app.string.btn_restart') : $r('app.string.btn_start'))
                 .fontSize(30)
                 .fontWeight(FontWeight.Bold)
                 .backgroundColor(Color.Green)
@@ -312,7 +352,7 @@ export struct Home {
                 })
 
             if (this.kernelStatus === KernelEventType.Started) {
-                Button("Stop")
+                Button($r('app.string.btn_stop'))
                     .fontSize(30)
                     .fontWeight(FontWeight.Bold)
                     .backgroundColor(Color.Red)
@@ -349,7 +389,7 @@ export struct Home {
                     .fontWeight(FontWeight.Bold)
                 Text(this.connectionInfo.protocol + '/' + this.connectionInfo.transport)
             } else {
-                Text('None selected')
+                Text($r('app.string.none_selected'))
             }
         }
         .width('100%')
@@ -367,7 +407,7 @@ export struct Home {
                     })
                     .backgroundColor(this.selectedConnection === conn.id ? Color.Red : undefined)
             } else {
-                Text('invalid')
+                Text($r('app.string.invalid_option'))
             }
         }
         .width('100%')
@@ -381,7 +421,7 @@ export struct Home {
                     .fontSize(18)
                     .fontWeight(FontWeight.Bold)
                     .margin({ left: 8 })
-                Button('Edit')
+                Button($r('app.string.btn_edit'))
             }
             .borderRadius(8)
             .padding(8)

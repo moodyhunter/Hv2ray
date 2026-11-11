@@ -1,0 +1,256 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Hv2ray 模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Hv2ray 主入口"
+    },
+    {
+      "name": "tab_home",
+      "value": "首页"
+    },
+    {
+      "name": "tab_config",
+      "value": "配置"
+    },
+    {
+      "name": "tab_settings",
+      "value": "设置"
+    },
+    {
+      "name": "status_starting",
+      "value": "启动中"
+    },
+    {
+      "name": "status_started",
+      "value": "已启动"
+    },
+    {
+      "name": "status_crashed",
+      "value": "已崩溃"
+    },
+    {
+      "name": "status_stopped",
+      "value": "已停止"
+    },
+    {
+      "name": "stat_proxy_up",
+      "value": "代理：上传"
+    },
+    {
+      "name": "stat_proxy_down",
+      "value": "代理：下载"
+    },
+    {
+      "name": "stat_direct_up",
+      "value": "直连：上传"
+    },
+    {
+      "name": "stat_direct_down",
+      "value": "直连：下载"
+    },
+    {
+      "name": "stat_total_up",
+      "value": "累计上传"
+    },
+    {
+      "name": "stat_total_down",
+      "value": "累计下载"
+    },
+    {
+      "name": "btn_start",
+      "value": "启动"
+    },
+    {
+      "name": "btn_restart",
+      "value": "重启"
+    },
+    {
+      "name": "btn_stop",
+      "value": "停止"
+    },
+    {
+      "name": "btn_full_vpn",
+      "value": "全局代理"
+    },
+    {
+      "name": "btn_wg_only",
+      "value": "仅 WireGuard"
+    },
+    {
+      "name": "btn_edit",
+      "value": "编辑"
+    },
+    {
+      "name": "btn_save",
+      "value": "保存"
+    },
+    {
+      "name": "btn_reload",
+      "value": "重新加载"
+    },
+    {
+      "name": "none_selected",
+      "value": "未选择"
+    },
+    {
+      "name": "invalid_option",
+      "value": "无效"
+    },
+    {
+      "name": "cfg_use_proxy",
+      "value": "使用代理"
+    },
+    {
+      "name": "cfg_sub_link_hint",
+      "value": "订阅链接"
+    },
+    {
+      "name": "cfg_btn_get",
+      "value": "获取"
+    },
+    {
+      "name": "cfg_sub_content",
+      "value": "订阅内容"
+    },
+    {
+      "name": "cfg_btn_decode",
+      "value": "开始解码"
+    },
+    {
+      "name": "cfg_decoded_content",
+      "value": "解码结果"
+    },
+    {
+      "name": "wg_note",
+      "value": "为每次 VPN 会话生成的 “wg-outbound” 提供参数，下次启动时生效。"
+    },
+    {
+      "name": "wg_private_key",
+      "value": "私钥"
+    },
+    {
+      "name": "wg_private_key_hint",
+      "value": "base64 格式的 WireGuard 私钥"
+    },
+    {
+      "name": "wg_peer_public_key",
+      "value": "对端公钥"
+    },
+    {
+      "name": "wg_peer_public_key_hint",
+      "value": "base64 格式的对端公钥"
+    },
+    {
+      "name": "wg_peer_endpoint",
+      "value": "对端接入点"
+    },
+    {
+      "name": "wg_local_ip",
+      "value": "本机 IP"
+    },
+    {
+      "name": "wg_local_ip_hint",
+      "value": "本设备的地址"
+    },
+    {
+      "name": "wg_keepalive",
+      "value": "保活间隔（秒）"
+    },
+    {
+      "name": "wg_routes",
+      "value": "路由 / 允许的地址"
+    },
+    {
+      "name": "wg_routes_hint",
+      "value": "每行一个 CIDR，例如 100.64.0.0/10"
+    },
+    {
+      "name": "err_wg_private_key",
+      "value": "私钥不能为空"
+    },
+    {
+      "name": "err_wg_peer_public_key",
+      "value": "对端公钥不能为空"
+    },
+    {
+      "name": "err_wg_peer_endpoint",
+      "value": "对端接入点不能为空"
+    },
+    {
+      "name": "err_wg_local_ip",
+      "value": "本机 IP 不能为空"
+    },
+    {
+      "name": "err_wg_mtu_positive",
+      "value": "MTU 必须是正整数"
+    },
+    {
+      "name": "err_wg_mtu_max",
+      "value": "MTU 不能超过 %d，即 TUN 接口的 MTU"
+    },
+    {
+      "name": "err_wg_keepalive",
+      "value": "保活间隔必须是正整数"
+    },
+    {
+      "name": "err_wg_routes_required",
+      "value": "至少需要一条路由（CIDR）"
+    },
+    {
+      "name": "err_wg_cidr_invalid",
+      "value": "无效的 CIDR：%s"
+    },
+    {
+      "name": "msg_wg_saved",
+      "value": "WireGuard 设置已保存"
+    },
+    {
+      "name": "msg_wg_save_failed",
+      "value": "写入 settings.json 失败，更改未保存"
+    },
+    {
+      "name": "demo_filter_room_type",
+      "value": "房屋户型"
+    },
+    {
+      "name": "demo_filter_style",
+      "value": "房屋风格"
+    },
+    {
+      "name": "demo_room_1bed",
+      "value": "一居室"
+    },
+    {
+      "name": "demo_room_2bed",
+      "value": "两居室"
+    },
+    {
+      "name": "demo_room_3bed",
+      "value": "三居室"
+    },
+    {
+      "name": "demo_room_4bed",
+      "value": "四居室"
+    },
+    {
+      "name": "demo_style_wood",
+      "value": "原木风"
+    },
+    {
+      "name": "demo_style_minimal",
+      "value": "简约风"
+    },
+    {
+      "name": "demo_style_new_chinese",
+      "value": "新中式"
+    },
+    {
+      "name": "demo_style_cream",
+      "value": "奶油风"
+    }
+  ]
+}

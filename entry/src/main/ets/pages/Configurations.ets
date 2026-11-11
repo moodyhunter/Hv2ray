@@ -81,19 +81,19 @@ export struct Configurations {
         Row() {
             Checkbox()
                 .select(this.useProxy!!)
-            Text('Use Proxy')
+            Text($r('app.string.cfg_use_proxy'))
         }
     }
 
     build() {
         Column({ space: 16 }) {
             Row ({ space: 8 }) {
-                TextInput({ placeholder: 'subscription link', text: this.subscriptionLink!! })
+                TextInput({ placeholder: $r('app.string.cfg_sub_link_hint'), text: this.subscriptionLink!! })
                     .height('100%')
                     .layoutWeight(1)
 
                 this.useProxyCheckbox();
-                Button('GET')
+                Button($r('app.string.cfg_btn_get'))
                     .onClick(async () => {
                         Logger.Warn(TAG, `GET using proxy: ${this.useProxy}`)
                         await this.doGetSubscriptionData();
@@ -106,7 +106,7 @@ export struct Configurations {
             .height(40)
 
             Column({ space: 8 }) {
-                Text('Subscription Content')
+                Text($r('app.string.cfg_sub_content'))
                 List({ space: 8 }) {
                     ForEach(this.subscriptionContent, (item: string) => {
                         ListItem() {
@@ -122,7 +122,7 @@ export struct Configurations {
             }
             .layoutWeight(1)
 
-            Button('Start Decoding')
+            Button($r('app.string.cfg_btn_decode'))
                 .margin(16)
                 .onClick(() => {
                     this.decoded = [];
@@ -130,7 +130,7 @@ export struct Configurations {
                 })
 
             Column({ space: 8 }) {
-                Text('Decoded Content')
+                Text($r('app.string.cfg_decoded_content'))
                 List({ space: 8 }) {
                     ForEach(this.decoded, (item: string) => {
                         ListItem() {

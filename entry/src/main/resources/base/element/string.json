@@ -11,6 +11,250 @@
     {
       "name": "EntryAbility_label",
       "value": "Hv2ray"
+    },
+    {
+      "name": "tab_home",
+      "value": "Home"
+    },
+    {
+      "name": "tab_config",
+      "value": "Config"
+    },
+    {
+      "name": "tab_settings",
+      "value": "Settings"
+    },
+    {
+      "name": "status_starting",
+      "value": "Starting"
+    },
+    {
+      "name": "status_started",
+      "value": "Started"
+    },
+    {
+      "name": "status_crashed",
+      "value": "Crashed"
+    },
+    {
+      "name": "status_stopped",
+      "value": "Stopped"
+    },
+    {
+      "name": "stat_proxy_up",
+      "value": "Proxy: Upload"
+    },
+    {
+      "name": "stat_proxy_down",
+      "value": "Proxy: Download"
+    },
+    {
+      "name": "stat_direct_up",
+      "value": "Direct: Upload"
+    },
+    {
+      "name": "stat_direct_down",
+      "value": "Direct: Download"
+    },
+    {
+      "name": "stat_total_up",
+      "value": "Total Upload"
+    },
+    {
+      "name": "stat_total_down",
+      "value": "Total Download"
+    },
+    {
+      "name": "btn_start",
+      "value": "Start"
+    },
+    {
+      "name": "btn_restart",
+      "value": "Restart"
+    },
+    {
+      "name": "btn_stop",
+      "value": "Stop"
+    },
+    {
+      "name": "btn_full_vpn",
+      "value": "Full"
+    },
+    {
+      "name": "btn_wg_only",
+      "value": "WG Only"
+    },
+    {
+      "name": "btn_edit",
+      "value": "Edit"
+    },
+    {
+      "name": "btn_save",
+      "value": "Save"
+    },
+    {
+      "name": "btn_reload",
+      "value": "Reload"
+    },
+    {
+      "name": "none_selected",
+      "value": "None selected"
+    },
+    {
+      "name": "invalid_option",
+      "value": "invalid"
+    },
+    {
+      "name": "cfg_use_proxy",
+      "value": "Use Proxy"
+    },
+    {
+      "name": "cfg_sub_link_hint",
+      "value": "subscription link"
+    },
+    {
+      "name": "cfg_btn_get",
+      "value": "GET"
+    },
+    {
+      "name": "cfg_sub_content",
+      "value": "Subscription Content"
+    },
+    {
+      "name": "cfg_btn_decode",
+      "value": "Start Decoding"
+    },
+    {
+      "name": "cfg_decoded_content",
+      "value": "Decoded Content"
+    },
+    {
+      "name": "wg_note",
+      "value": "Feeds the \"wg-outbound\" generated for every VPN session, effective on next start."
+    },
+    {
+      "name": "wg_private_key",
+      "value": "Private key"
+    },
+    {
+      "name": "wg_private_key_hint",
+      "value": "base64 wireguard private key"
+    },
+    {
+      "name": "wg_peer_public_key",
+      "value": "Peer public key"
+    },
+    {
+      "name": "wg_peer_public_key_hint",
+      "value": "base64 peer public key"
+    },
+    {
+      "name": "wg_peer_endpoint",
+      "value": "Peer endpoint"
+    },
+    {
+      "name": "wg_local_ip",
+      "value": "Local IP"
+    },
+    {
+      "name": "wg_local_ip_hint",
+      "value": "address of this device"
+    },
+    {
+      "name": "wg_keepalive",
+      "value": "Keepalive (s)"
+    },
+    {
+      "name": "wg_routes",
+      "value": "Routes / Allowed IPs"
+    },
+    {
+      "name": "wg_routes_hint",
+      "value": "one CIDR per line, e.g. 100.64.0.0/10"
+    },
+    {
+      "name": "err_wg_private_key",
+      "value": "Private key must not be empty"
+    },
+    {
+      "name": "err_wg_peer_public_key",
+      "value": "Peer public key must not be empty"
+    },
+    {
+      "name": "err_wg_peer_endpoint",
+      "value": "Peer endpoint must not be empty"
+    },
+    {
+      "name": "err_wg_local_ip",
+      "value": "Local IP must not be empty"
+    },
+    {
+      "name": "err_wg_mtu_positive",
+      "value": "MTU must be a positive integer"
+    },
+    {
+      "name": "err_wg_mtu_max",
+      "value": "MTU must not exceed %d, the TUN interface MTU"
+    },
+    {
+      "name": "err_wg_keepalive",
+      "value": "Keepalive interval must be a positive integer"
+    },
+    {
+      "name": "err_wg_routes_required",
+      "value": "At least one route (CIDR) is required"
+    },
+    {
+      "name": "err_wg_cidr_invalid",
+      "value": "Invalid CIDR: %s"
+    },
+    {
+      "name": "msg_wg_saved",
+      "value": "WireGuard settings saved"
+    },
+    {
+      "name": "msg_wg_save_failed",
+      "value": "Failed to write settings.json, the changes were not kept"
+    },
+    {
+      "name": "demo_filter_room_type",
+      "value": "House type"
+    },
+    {
+      "name": "demo_filter_style",
+      "value": "Decor style"
+    },
+    {
+      "name": "demo_room_1bed",
+      "value": "1-bedroom"
+    },
+    {
+      "name": "demo_room_2bed",
+      "value": "2-bedroom"
+    },
+    {
+      "name": "demo_room_3bed",
+      "value": "3-bedroom"
+    },
+    {
+      "name": "demo_room_4bed",
+      "value": "4-bedroom"
+    },
+    {
+      "name": "demo_style_wood",
+      "value": "Wood"
+    },
+    {
+      "name": "demo_style_minimal",
+      "value": "Minimal"
+    },
+    {
+      "name": "demo_style_new_chinese",
+      "value": "New Chinese"
+    },
+    {
+      "name": "demo_style_cream",
+      "value": "Cream"
     }
   ]
 }

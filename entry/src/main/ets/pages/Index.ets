@@ -49,17 +49,17 @@ struct Index {
                 TabContent() {
                     Home()
                 }
-                .tabBar('Home')
+                .tabBar($r('app.string.tab_home'))
 
                 TabContent() {
                     Configurations()
                 }
-                .tabBar('Config')
+                .tabBar($r('app.string.tab_config'))
 
                 TabContent() {
                     Settings()
                 }
-                .tabBar('Settings')
+                .tabBar($r('app.string.tab_settings'))
             }
             .layoutWeight(1)
             .vertical(true)

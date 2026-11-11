@@ -7,6 +7,11 @@ import { TUN_INTERFACE_MTU } from '../core/config/Generation';
 const TAG = "Hv2ray-Settings"
 const LABEL_WIDTH = 160;
 
+interface WgFormFailure {
+    reason: string;
+    message: ResourceStr;
+}
+
 @ComponentV2
 export struct Settings {
     @Local private wgPrivateKey: string = '';
@@ -58,46 +63,64 @@ export struct Settings {
         return value;
     }
 
+    private formatText(name: Resource, arg: string | number): string {
+        try {
+            return this.getUIContext()
+                .getHostContext()!
+                .resourceManager
+                .getStringSync(name.id, arg);
+        } catch (error) {
+            Logger.Error(TAG, `failed to format resource ${name.id}: ${JSON.stringify(error)}`);
+            return 'validation failed';
+        }
+    }
+
     /**
      * Returns the reason why the form cannot be saved, or undefined when
      * every field looks usable.
      */
-    private getValidationFailure(): string | undefined {
+    private getValidationFailure(): WgFormFailure | undefined {
         if (this.wgPrivateKey.trim().length === 0) {
-            return 'Private key must not be empty';
+            return { reason: 'private_key_empty', message: $r('app.string.err_wg_private_key') };
         }
         if (this.wgPeerPublicKey.trim().length === 0) {
-            return 'Peer public key must not be empty';
+            return { reason: 'peer_public_key_empty', message: $r('app.string.err_wg_peer_public_key') };
         }
         if (this.wgPeerEndpoint.trim().length === 0) {
-            return 'Peer endpoint must not be empty';
+            return { reason: 'peer_endpoint_empty', message: $r('app.string.err_wg_peer_endpoint') };
         }
         if (this.wgLocalIp.trim().length === 0) {
-            return 'Local IP must not be empty';
+            return { reason: 'local_ip_empty', message: $r('app.string.err_wg_local_ip') };
         }
         const mtu = this.parsePositiveInt(this.wgMtu);
         if (mtu < 0) {
-            return 'MTU must be a positive integer';
+            return { reason: 'mtu_not_positive', message: $r('app.string.err_wg_mtu_positive') };
         }
         if (mtu > TUN_INTERFACE_MTU) {
-            return `MTU must not exceed ${TUN_INTERFACE_MTU}, the TUN interface MTU`;
+            return {
+                reason: 'mtu_too_large',
+                message: this.formatText($r('app.string.err_wg_mtu_max'), TUN_INTERFACE_MTU)
+            };
         }
         if (this.parsePositiveInt(this.wgKeepalive) < 0) {
-            return 'Keepalive interval must be a positive integer';
+            return { reason: 'keepalive_not_positive', message: $r('app.string.err_wg_keepalive') };
         }
         const routes = this.parseRoutes(this.wgRoutes);
         if (routes.length === 0) {
-            return 'At least one route (CIDR) is required';
+            return { reason: 'no_routes', message: $r('app.string.err_wg_routes_required') };
         }
         for (const route of routes) {
             if (parseCidr(route) === undefined) {
-                return `Invalid CIDR: ${route}`;
+                return {
+                    reason: 'invalid_cidr',
+                    message: this.formatText($r('app.string.err_wg_cidr_invalid'), route)
+                };
             }
         }
         return undefined;
     }
 
-    private async showFormError(message: string): Promise<void> {
+    private async showFormError(message: ResourceStr): Promise<void> {
         await this.getUIContext()
             .getPromptAction()
             .showDialog({ message: message })
@@ -109,14 +132,14 @@ export struct Settings {
     private notifySaved(): void {
         this.getUIContext()
             .getPromptAction()
-            .showToast({ message: 'WireGuard settings saved' });
+            .showToast({ message: $r('app.string.msg_wg_saved') });
     }
 
     private async doSave(): Promise<void> {
         const failure = this.getValidationFailure();
         if (failure !== undefined) {
-            Logger.Error(TAG, `refusing to save: ${failure}`);
-            await this.showFormError(failure);
+            Logger.Error(TAG, `refusing to save: ${failure.reason}`);
+            await this.showFormError(failure.message);
             return;
         }
 
@@ -131,7 +154,7 @@ export struct Settings {
 
         const saved = await ConfigManager.saveWireGuardSettings(wg);
         if (!saved) {
-            await this.showFormError('Failed to write settings.json, the changes were not kept');
+            await this.showFormError($r('app.string.msg_wg_save_failed'));
             return;
         }
         Logger.Info(TAG, `wireguard settings saved, ${wg.routes.length} route(s)`);
@@ -146,35 +169,35 @@ export struct Settings {
                     .fontSize(24)
                     .fontWeight(FontWeight.Bold)
 
-                Text('Feeds the "wg-outbound" generated for every VPN session, effective on next start.')
+                Text($r('app.string.wg_note'))
                     .fontSize(13)
                     .fontColor($r('sys.color.font_tertiary'))
 
                 Row({ space: 8 }) {
-                    Text('Private key')
+                    Text($r('app.string.wg_private_key'))
                         .width(LABEL_WIDTH)
-                    TextInput({ placeholder: 'base64 wireguard private key', text: this.wgPrivateKey!! })
+                    TextInput({ placeholder: $r('app.string.wg_private_key_hint'), text: this.wgPrivateKey!! })
                         .layoutWeight(1)
                 }
 
                 Row({ space: 8 }) {
-                    Text('Peer public key')
+                    Text($r('app.string.wg_peer_public_key'))
                         .width(LABEL_WIDTH)
-                    TextInput({ placeholder: 'base64 peer public key', text: this.wgPeerPublicKey!! })
+                    TextInput({ placeholder: $r('app.string.wg_peer_public_key_hint'), text: this.wgPeerPublicKey!! })
                         .layoutWeight(1)
                 }
 
                 Row({ space: 8 }) {
-                    Text('Peer endpoint')
+                    Text($r('app.string.wg_peer_endpoint'))
                         .width(LABEL_WIDTH)
                     TextInput({ placeholder: 'host:port', text: this.wgPeerEndpoint!! })
                         .layoutWeight(1)
                 }
 
                 Row({ space: 8 }) {
-                    Text('Local IP')
+                    Text($r('app.string.wg_local_ip'))
                         .width(LABEL_WIDTH)
-                    TextInput({ placeholder: 'address of this device', text: this.wgLocalIp!! })
+                    TextInput({ placeholder: $r('app.string.wg_local_ip_hint'), text: this.wgLocalIp!! })
                         .layoutWeight(1)
                 }
 
@@ -187,7 +210,7 @@ export struct Settings {
                 }
 
                 Row({ space: 8 }) {
-                    Text('Keepalive (s)')
+                    Text($r('app.string.wg_keepalive'))
                         .width(LABEL_WIDTH)
                     TextInput({ placeholder: '25', text: this.wgKeepalive!! })
                         .type(InputType.Number)
@@ -195,19 +218,19 @@ export struct Settings {
                 }
 
                 Column({ space: 4 }) {
-                    Text('Routes / Allowed IPs')
-                    TextArea({ placeholder: 'one CIDR per line, e.g. 100.64.0.0/10', text: this.wgRoutes!! })
+                    Text($r('app.string.wg_routes'))
+                    TextArea({ placeholder: $r('app.string.wg_routes_hint'), text: this.wgRoutes!! })
                         .height(140)
                         .width('100%')
                 }
                 .width('100%')
 
                 Row({ space: 16 }) {
-                    Button('Save')
+                    Button($r('app.string.btn_save'))
                         .onClick(async () => {
                             await this.doSave();
                         })
-                    Button('Reload')
+                    Button($r('app.string.btn_reload'))
                         .onClick(() => {
                             this.loadFromManager();
                         })
