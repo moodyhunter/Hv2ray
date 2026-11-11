@@ -38,7 +38,7 @@ export async function readFullFile(filePath: string): Promise<string | undefined
             return undefined;
         }
     } catch (error) {
-        Logger.Error(TAG, `failed to read from file: ${JSON.stringify(error)}`);
+        Logger.Error(TAG, `failed to read from file '${filePath}': ${JSON.stringify(error)}`);
         return undefined;
     }
 
@@ -63,8 +63,10 @@ export async function loadFromFile<T>(ctor: Ctor<T>, filePath: string): Promise<
             return JSON.parse(strContent) as T;
         }
     } catch (e) {
-        Logger.Error(TAG, `failed to parse JSON`);
-        return new Object() as T;
+        // 读不出内容就返回 undefined，不能拿空对象顶上：调用方都按 undefined 走
+        // "读不到"的分支，而一个空对象会被当成合法配置继续传下去。
+        Logger.Error(TAG, `failed to parse JSON in '${filePath}'`);
+        return undefined;
     }
 }
 

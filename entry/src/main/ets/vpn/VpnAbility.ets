@@ -7,7 +7,6 @@ import { KernelEventType, Stat } from '../utils/Common';
 import { CommonEventUtils } from '../utils/CommonEventUtils';
 import { BUNDLE_NAME } from 'BuildProfile';
 import { VCoreManager } from './VCoreManager';
-import { fileIo } from '@kit.CoreFileKit';
 
 const TAG = "Hv2ray-VpnAbility";
 const TUN_IP = "198.18.0.1";
@@ -16,8 +15,39 @@ export class VpnAbility extends VpnExtensionAbility {
     private vpnConnection: vpnExtension.VpnConnection = null!;
     private kernelCrashed: boolean = false;
 
+    /**
+     * 启动参数只在主能力调用 startVpnExtensionAbility 时才会带上：系统按 wantAgent
+     * 重新拉起 VpnAbility 时 want 里什么都没有。没有配置就不要把空串交给内核，
+     * 它只会回一句看不懂的 "infra/conf/v5cfg: unable to load json > EOF"。
+     */
+    private parseStartParams(want: Want): VCoreManager.StartVCoreParams | undefined {
+        const raw = (want.parameters?.['params'] ?? '') as string;
+        if (raw.length === 0) {
+            Logger.Error(TAG, `VpnAbility started without start parameters`);
+            return undefined;
+        }
+
+        try {
+            const params: VCoreManager.StartVCoreParams = JSON.parse(raw);
+            if (!params.config || params.config.length === 0) {
+                Logger.Error(TAG, `VpnAbility started with an empty configuration`);
+                return undefined;
+            }
+            return params;
+        } catch (e) {
+            Logger.Error(TAG, `failed to parse start parameters: ${e.message}`);
+            return undefined;
+        }
+    }
+
     private async doCreateVpn(want: Want): Promise<void> {
         this.kernelCrashed = false;
+
+        const params = this.parseStartParams(want);
+        if (!params) {
+            CommonEventUtils.publishKernelErrorEvent(KernelEventType.Crashed, ['no configuration to start']);
+            return Promise.reject();
+        }
 
         try {
             let config: vpnExtension.VpnConfig = {
@@ -30,7 +60,6 @@ export class VpnAbility extends VpnExtensionAbility {
 
             this.vpnConnection.protectProcessNet();
 
-            const params: VCoreManager.StartVCoreParams = JSON.parse(want.parameters!['params'] as string);
             params.config = params.config.replace('<<FDXXX>>', 'fd:' + tunFd.toString());
 
             if (VCoreManager.StartVCore(params)) {
@@ -54,14 +83,6 @@ export class VpnAbility extends VpnExtensionAbility {
 
     onCreate(want: Want): void {
         Logger.Info(TAG, `VpnAbility onCreate`);
-        // list files in configuration dir
-        const configFile = this.context.tempDir + '/test.conf';
-        try {
-            Logger.Error(TAG, `accessing file: ${JSON.stringify(configFile)}`);
-            fileIo.openSync(configFile, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE);
-        } catch (e) {
-            Logger.Error(TAG, `failed to access files: ${JSON.stringify(e)}, ${configFile}`);
-        }
         CommonEventUtils.publishKernelErrorEvent(KernelEventType.Starting);
         this.vpnConnection = vpnExtension.createVpnConnection(this.context);
         this.doCreateVpn(want)

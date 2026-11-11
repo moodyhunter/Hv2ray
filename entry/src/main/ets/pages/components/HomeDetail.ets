@@ -57,15 +57,26 @@ class ConnectionInfo {
         this.config = root;
         this.connectionName = ConfigManager.getConnection(connId)?.name ?? "<invalid>";
         if (root.outbounds && root.outbounds.length > 0) {
-            this.remoteHost = root.outbounds[0].settings['address'] as string;
-            this.remotePort = root.outbounds[0].settings['port'] as number;
-            this.protocol = root.outbounds[0].protocol;
-            this.transport = root.outbounds[0].streamSettings?.transport ?? '<unknown>';
+            const outbound = root.outbounds[0];
+            const settings = outbound.settings;
+            if (settings) {
+                this.remoteHost = settings['address'] as string;
+                this.remotePort = settings['port'] as number;
+            }
+            this.protocol = outbound.protocol;
+            this.transport = outbound.streamSettings?.transport ?? '<unknown>';
         }
     }
 
-    static async getConnectionInfo(connId: string): Promise<ConnectionInfo> {
-        const root = (await ConfigManager.loadConnectionFromFile(connId))!;
+    static async getConnectionInfo(connId: string): Promise<ConnectionInfo | undefined> {
+        // 连接文件可能在别处被删掉或写坏，这里不能假定它一定读得出来：
+        // 直接把 undefined 传进构造函数会在 root.outbounds 上抛异常，
+        // 结果是详情区静默地没有连接信息，启动时又把空配置交给内核。
+        const root = await ConfigManager.loadConnectionFromFile(connId);
+        if (!root) {
+            Logger.Error(TAG, `connection ${connId} has no readable configuration file`);
+            return undefined;
+        }
         return new ConnectionInfo(connId, root);
     }
 }
@@ -82,6 +93,8 @@ export struct HomeConnectionDetail {
     @Event onFullVpnChange: (isFullVpn: boolean) => void = (_isFullVpn: boolean): void => {
     };
     @Local connectionInfo: ConnectionInfo | undefined = undefined;
+    /** 选中了连接但读不出它的配置文件；不渲染，所以不是状态变量。 */
+    private configUnreadable: boolean = false;
 
     @Monitor('connectionIdValue')
     async onConnectionIdChanged() {
@@ -95,9 +108,11 @@ export struct HomeConnectionDetail {
     private async reloadConnectionInfo(): Promise<void> {
         if (this.connectionIdValue.length === 0) {
             this.connectionInfo = undefined;
+            this.configUnreadable = false;
             return;
         }
         this.connectionInfo = await ConnectionInfo.getConnectionInfo(this.connectionIdValue);
+        this.configUnreadable = this.connectionInfo === undefined;
     }
 
     private get kernelStatus(): KernelEventType {
@@ -121,7 +136,16 @@ export struct HomeConnectionDetail {
         return JSON.stringify(final);
     }
 
-    private async doStartKernel(): Promise<void> {
+    private async showNotice(message: ResourceStr): Promise<void> {
+        await this.getUIContext()
+            .getPromptAction()
+            .showDialog({ message: message })
+            .catch(() => {
+                Logger.Error(TAG, `show dialog failed!`);
+            });
+    }
+
+    private async doStartKernel(config: string): Promise<void> {
         const context = this.getUIContext()
             .getHostContext()!;
         const fileDir = context.getApplicationContext().filesDir;
@@ -161,7 +185,7 @@ export struct HomeConnectionDetail {
         }
 
         let params: VCoreManager.StartVCoreParams = {
-            config: this.getCurrentConfig(),
+            config: config,
             statsPort: 18888,
             directTag: 'direct',
             proxyTag: 'outbound',
@@ -246,6 +270,17 @@ export struct HomeConnectionDetail {
                     .width('100%')
                     .onClick(async () => {
                         Logger.Info(TAG, `onStart`);
+                        // 没有可用的连接配置时 getCurrentConfig 只会给出空串，内核接着报
+                        // "infra/conf/v5cfg: unable to load json > EOF"。先在这里挡住，
+                        // 也免得先停掉正在跑的会话、再去启动一个空配置。
+                        const config = this.getCurrentConfig();
+                        if (config.length === 0) {
+                            await this.showNotice(this.configUnreadable
+                                ? $r('app.string.err_config_unreadable')
+                                : $r('app.string.err_no_connection_selected'));
+                            return;
+                        }
+
                         const currentStatus = this.kernelStatus;
                         await vpnExtension.stopVpnExtensionAbility({
                             bundleName: BUNDLE_NAME,
@@ -257,10 +292,10 @@ export struct HomeConnectionDetail {
 
                         if (currentStatus === KernelEventType.Started) {
                             setTimeout(() => {
-                                this.doStartKernel();
+                                this.doStartKernel(config);
                             }, 500);
                         } else {
-                            await this.doStartKernel();
+                            await this.doStartKernel(config);
                         }
 
                     })

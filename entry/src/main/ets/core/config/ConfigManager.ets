@@ -121,8 +121,7 @@ export class ConfigManagerImpl {
             }
         }
 
-        // loadFromFile returns a plain object when settings.json is missing or malformed,
-        // in which case the built-in defaults are kept.
+        // settings.json 缺失或读不出时返回 undefined，这里保留内置默认值。
         const wgSettings = await this.loadConfigFromFile(WireGuardSettings, SETTINGS_FILE);
         if (wgSettings instanceof WireGuardSettings) {
             this.wgSettings = wgSettings;

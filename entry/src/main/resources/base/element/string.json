@@ -349,6 +349,10 @@
       "value": "Cannot read this connection's configuration file"
     },
     {
+      "name": "err_no_connection_selected",
+      "value": "Select a connection first, the kernel needs its configuration to start"
+    },
+    {
       "name": "err_kernel_start_failed",
       "value": "The kernel failed to start and gave no details"
     },

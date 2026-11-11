@@ -345,6 +345,10 @@
       "value": "无法读取该连接的配置文件"
     },
     {
+      "name": "err_no_connection_selected",
+      "value": "请先选择一个连接，内核需要它的配置才能启动"
+    },
+    {
       "name": "err_kernel_start_failed",
       "value": "内核启动失败，且没有返回具体原因"
     },
