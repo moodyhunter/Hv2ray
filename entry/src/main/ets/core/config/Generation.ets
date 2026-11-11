@@ -10,6 +10,8 @@ export class ConfigurationBuilder {
     private configRoot: Required<ConfigRoot>;
 
     constructor(input: ConfigRoot) {
+        // structuredClone 在本工程 SDK 的 ArkTS 里不存在（Cannot find name 'structuredClone'），
+        // 所以这里只能用 JSON 往返做深拷贝；code-linter 的 bad-deep-clone-check 因此消不掉。
         const configRoot: ConfigRoot = JSON.parse(JSON.stringify(input));
         if (configRoot.inbounds === undefined) {
             configRoot.inbounds = [];

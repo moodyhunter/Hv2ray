@@ -131,9 +131,13 @@ export struct Settings {
     }
 
     private notifySaved(): void {
-        this.getUIContext()
-            .getPromptAction()
-            .showToast({ message: $r('app.string.msg_wg_saved') });
+        try {
+            this.getUIContext()
+                .getPromptAction()
+                .showToast({ message: $r('app.string.msg_wg_saved') });
+        } catch (error) {
+            Logger.Error(TAG, `failed to show saved toast: ${JSON.stringify(error)}`);
+        }
     }
 
     private async doSave(): Promise<void> {

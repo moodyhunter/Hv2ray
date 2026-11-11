@@ -128,7 +128,7 @@ export struct Configurations {
                         }
                         .border({ color: Color.Red, width: 1 })
                         .backgroundColor($r('sys.color.gray_03'))
-                    })
+                    }, (item: string, index: number): string => `${index}_${item}`)
                 }
                 .width('100%')
                 .layoutWeight(1)
@@ -156,7 +156,7 @@ export struct Configurations {
                         }
                         .border({ color: Color.Green, width: 1 })
                         .backgroundColor($r('sys.color.gray_03'))
-                    })
+                    }, (item: string, index: number): string => `${index}_${item}`)
                 }
                 .width('100%')
                 .layoutWeight(1)

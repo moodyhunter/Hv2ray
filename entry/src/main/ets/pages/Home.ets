@@ -400,9 +400,12 @@ struct HomeConnectionDetail {
                     .fontWeight(FontWeight.Bold)
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    // 主机名里的点也是断行点，按词断会只留下前半段；和左列表一样按字符截。
+                    .wordBreak(WordBreak.BREAK_ALL)
                 Text(this.connectionInfo.protocol + '/' + this.connectionInfo.transport)
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .wordBreak(WordBreak.BREAK_ALL)
             } else {
                 Text($r('app.string.none_selected'))
             }
@@ -541,10 +544,13 @@ struct HomeConnectionListItem {
             SymbolGlyph($r('sys.symbol.ellipsis_circle'))
                 .fontSize(20)
                 .fontColor([$r('sys.color.icon_secondary')])
+                // 图标本身只有 20vp，鼠标/手指容易脱靶；撑到 32vp 命中区。
+                .width(32)
+                .height(32)
                 .accessibilityText($r('app.string.menu_more_actions'))
                 .bindMenu(this.rowMenu, HOME_MENU_OPTIONS)
         }
-        .padding({ left: 8, right: 8 })
+        // 左右内边距由 ListItemStyle.CARD 提供（8vp），这里不能再补一份，否则文本距卡边 16vp。
         .width('100%')
         .height('100%')
         .alignItems(VerticalAlign.Center)
@@ -875,7 +881,7 @@ export struct Home {
                 .fontSize(12)
                 .fontColor($r('sys.color.font_tertiary'))
         }
-        .padding({ left: 8, right: 8 })
+        // 与行一致：左右内边距交给 ListItemGroupStyle.CARD，避免和它的内沿叠加。
         .width('100%')
         .height(GROUP_HEADER_HEIGHT)
     }
