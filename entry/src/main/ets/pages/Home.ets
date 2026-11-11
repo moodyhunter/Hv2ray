@@ -19,6 +19,7 @@ import Logger from '../utils/Logging';
 import { Want } from '@kit.AbilityKit';
 import { BUNDLE_NAME } from 'BuildProfile';
 import { ConfigurationBuilder } from '../core/config/Generation';
+import { HdsListItem, SuffixCustomBuilder } from '@kit.UIDesignKit';
 
 const TAG = "Hv2ray-HomePage"
 
@@ -34,7 +35,6 @@ const NAV_BAR_MAX_WIDTH = 520;
 const MIN_CONTENT_WIDTH = 360;
 
 const MOVE_RADIO_GROUP = 'homeMoveConnectionGroup';
-const SWIPE_ACTION_WIDTH = 80;
 const MAX_PORT = 65535;
 
 /**
@@ -439,11 +439,12 @@ struct HomeConnectionDetail {
 }
 
 /**
- * 一行连接。根节点必须是 ListItem：List / ListItemGroup 允许自定义组件，但要求自定义组件
- * 的顶层就是 ListItem 或 ListItemGroup。
+ * 一行连接。用 UI Design Kit 的 `HdsListItem`（内部就是带 HDS 规格的 ListItem）：
+ * 文本走 `textItem`，横滑删除走 `swipeActionOptions`，选中态走 `isSelected`，
+ * 右键菜单走 `menuStyle` + `menuBuilder`。
  *
- * 菜单与划出操作用**零参 @Builder 按引用**绑定（`bindContextMenu(this.rowMenu, …)`），
- * 不在属性位置调用带参数的 builder。
+ * 菜单 builder 必须是**零参 @Builder 按引用**传（`menuBuilder: this.rowMenu`）；
+ * 在属性位置调用带参 builder 会让菜单内容为空。
  */
 @ComponentV2
 struct HomeConnectionListItem {
@@ -479,62 +480,14 @@ struct HomeConnectionListItem {
         }
     }
 
-    @Builder
-    swipeDelete() {
-        Row() {
-            SymbolGlyph($r('sys.symbol.trash'))
-                .fontSize(22)
-                .fontColor([$r('sys.color.font_on_primary')])
-        }
-        .justifyContent(FlexAlign.Center)
-        .width(SWIPE_ACTION_WIDTH)
-        .height('100%')
-        .backgroundColor($r('sys.color.alert'))
-        .onClick((): void => {
-            this.onDeleteRequested(this.row);
-        })
-    }
-
-    build() {
-        ListItem({ style: ListItemStyle.CARD }) {
-            this.rowContent()
-        }
-        .height(ROW_HEIGHT)
-        .selected(this.isSelected)
-        .onClick((): void => {
-            this.onRowOpen(this.row.connection.id);
-        })
-        .bindContextMenu(this.rowMenu, ResponseType.LongPress, HOME_MENU_OPTIONS)
-        .swipeAction({
-            end: {
-                builder: (): void => {
-                    this.swipeDelete();
-                },
-                actionAreaDistance: SWIPE_ACTION_WIDTH,
-                onAction: (): void => {
-                    this.onDeleteRequested(this.row);
-                }
-            }
-        })
-    }
-
     /**
-     * 行内容要占满整行高度并自己做垂直居中。反过来让 ListItem 去“居中一个更矮的子节点”，
-     * 那个 y 偏移是父节点替子节点算的，快滚复用节点后会残留旧值——表现为行内文字上下偏。
+     * 行尾控件：选中勾 + 更多入口。菜单在这里用 `bindMenu`（点图标，触屏也有入口），
+     * 同时由 HdsListItem 的 `menuStyle` 承接鼠标右键——`MenuStyle.responseType` 只能配一种，
+     * 所以两个入口分开挂。
      */
     @Builder
-    rowContent() {
+    rowTrailing() {
         Row({ space: 8 }) {
-            Text(this.row.connection.name)
-                .fontSize(15)
-                .fontColor($r('sys.color.font_primary'))
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                // 默认按单词断（BREAK_WORD），英文/UUID 这类名字会在最后一个空格处就截掉，右边留一大块空白。
-                // 文档给的按字符截断配方就是 BREAK_ALL + Ellipsis + maxLines。
-                .wordBreak(WordBreak.BREAK_ALL)
-                .layoutWeight(1)
-
             if (this.isSelected) {
                 SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
                     .fontSize(20)
@@ -550,12 +503,39 @@ struct HomeConnectionListItem {
                 .accessibilityText($r('app.string.menu_more_actions'))
                 .bindMenu(this.rowMenu, HOME_MENU_OPTIONS)
         }
-        // 左右内边距由 ListItemStyle.CARD 提供（8vp），这里不能再补一份，否则文本距卡边 16vp。
-        .width('100%')
-        .height('100%')
-        .alignItems(VerticalAlign.Center)
-        // 鼠标右键走内层 Row，长按由外层 ListItem 承接：同一节点只能绑一个 responseType。
-        .bindContextMenu(this.rowMenu, ResponseType.RightClick, HOME_MENU_OPTIONS)
+    }
+
+    build() {
+        HdsListItem({
+            hdsListItemCard: {
+                textItem: {
+                    primaryText: { text: this.row.connection.name },
+                },
+                suffixItem: new SuffixCustomBuilder((): void => {
+                    this.rowTrailing();
+                }),
+                cardHeight: ROW_HEIGHT,
+                cardId: this.row.connection.id,
+                onClick: (): void => {
+                    this.onRowOpen(this.row.connection.id);
+                },
+            },
+            isSelected: this.isSelected,
+            menuStyle: {
+                responseType: ResponseType.RightClick,
+                menuOptions: HOME_MENU_OPTIONS,
+            },
+            menuBuilder: this.rowMenu,
+            swipeActionOptions: {
+                icons: [{
+                    icon: new SymbolGlyphModifier($r('sys.symbol.trash')),
+                    backgroundColor: $r('sys.color.alert'),
+                    onAction: (): void => {
+                        this.onDeleteRequested(this.row);
+                    },
+                }],
+            },
+        })
     }
 }
 
