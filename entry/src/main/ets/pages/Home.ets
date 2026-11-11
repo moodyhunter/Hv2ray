@@ -4,9 +4,9 @@ import { GlobalKernelStatus, kernelStatusColor, kernelStatusLabel } from './Page
 import { ConfigManager, ConfigChangeListener } from '../core/config/ConfigManager';
 import { StreamObject } from '../core/config/Config';
 import { JsonObject } from '../core/config/ConfigDefs';
-import { HomeConnectionDetail } from './HomeDetail';
-import { HomeConnectionListItem } from './HomeListRow';
-import { HomeEditDraft, HomeEditSheetForm } from './HomeEditSheet';
+import { HomeConnectionDetail } from './components/HomeDetail';
+import { HomeConnectionListItem } from './components/HomeListRow';
+import { HomeEditDraft, HomeEditSheetForm } from './components/HomeEditSheet';
 import {
     GROUP_HEADER_HEIGHT,
     GROUP_ITEM_SPACING,
@@ -15,7 +15,7 @@ import {
     HomeGroupOption,
     HomeGroupRow,
     stopKernel
-} from './HomeCommon';
+} from './components/HomeCommon';
 import Logger from '../utils/Logging';
 
 const TAG = "Hv2ray-HomePage"
@@ -38,11 +38,11 @@ interface HomeDetailParam {
 }
 
 /**
- * 左列（分组 + 连接）与导航壳。分成几块：
- * - 一行连接怎么画：HomeListRow.ets
- * - 详情区（状态、流量、启停）：HomeDetail.ets
- * - 编辑半模态的表单：HomeEditSheet.ets
- * - 派生视图类型、行尺寸、行菜单参数、停止内核：HomeCommon.ets
+ * 左列（分组 + 连接）与导航壳。其余几块在 pages/components/ 下：
+ * - 一行连接怎么画：components/HomeListRow.ets
+ * - 详情区（状态、流量、启停）：components/HomeDetail.ets
+ * - 编辑半模态的表单：components/HomeEditSheet.ets
+ * - 派生视图类型、行尺寸、行菜单参数、停止内核：components/HomeCommon.ets
  * 这里留下的是：数据到派生视图的推导、增删改与校验、导航与分栏。
  */
 @ComponentV2

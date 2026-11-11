@@ -2,20 +2,20 @@ import { vpnExtension } from '@kit.NetworkKit';
 import { Want } from '@kit.AbilityKit';
 import fs from '@ohos.file.fs';
 import { BUNDLE_NAME } from 'BuildProfile';
-import { KernelEventType } from '../utils/Common';
+import { KernelEventType } from '../../utils/Common';
 import {
     GlobalKernelStatus,
     GlobalStat,
     kernelStatusColor,
     kernelStatusLabel,
     prettyPrintBytes
-} from './PageCommon';
-import { VCoreManager } from '../vpn/VCoreManager';
-import { ConfigManager } from '../core/config/ConfigManager';
-import { ConfigRoot } from '../core/config/Config';
-import { ConfigurationBuilder } from '../core/config/Generation';
+} from '../PageCommon';
+import { VCoreManager } from '../../vpn/VCoreManager';
+import { ConfigManager } from '../../core/config/ConfigManager';
+import { ConfigRoot } from '../../core/config/Config';
+import { ConfigurationBuilder } from '../../core/config/Generation';
 import { stopKernel } from './HomeCommon';
-import Logger from '../utils/Logging';
+import Logger from '../../utils/Logging';
 
 const TAG = 'Hv2ray-HomePage';
 

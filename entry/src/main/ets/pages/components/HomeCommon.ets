@@ -5,9 +5,9 @@
  */
 import { vpnExtension } from '@kit.NetworkKit';
 import { BUNDLE_NAME } from 'BuildProfile';
-import { Connection } from '../core/config/Connection';
-import { VCoreManager } from '../vpn/VCoreManager';
-import Logger from '../utils/Logging';
+import { Connection } from '../../core/config/Connection';
+import { VCoreManager } from '../../vpn/VCoreManager';
+import Logger from '../../utils/Logging';
 
 const TAG = 'Hv2ray-HomePage';
 
