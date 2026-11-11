@@ -41,7 +41,7 @@ export struct Configurations {
         }
     }
 
-    private decode() {
+    private async decode(): Promise<void> {
         for (const line of this.subscriptionContent) {
             const item = this.decodeOne(line);
             if (item) {
@@ -57,7 +57,8 @@ export struct Configurations {
                         rule: []
                     }
                 };
-                ConfigManager.addConnectionToGroup(item.name, 'subscription', configRoot)
+                // 逐条 await：并发的 addConnectionToGroup 会对同一个 groups.json 交错写入。
+                await ConfigManager.addConnectionToGroup(item.name, 'subscription', configRoot)
             }
         }
     }
@@ -138,9 +139,9 @@ export struct Configurations {
 
             Button($r('app.string.cfg_btn_decode'))
                 .margin(16)
-                .onClick(() => {
+                .onClick(async () => {
                     this.decoded = [];
-                    this.decode();
+                    await this.decode();
                 })
 
             Column({ space: 8 }) {

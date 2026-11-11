@@ -78,7 +78,7 @@
     },
     {
       "name": "btn_wg_only",
-      "value": "仅 WireGuard"
+      "value": "仅 WG"
     },
     {
       "name": "btn_edit",
@@ -251,6 +251,98 @@
     {
       "name": "demo_style_cream",
       "value": "奶油风"
+    },
+    {
+      "name": "demo_section_title",
+      "value": "筛选列表示例"
+    },
+    {
+      "name": "list_search_hint",
+      "value": "过滤连接"
+    },
+    {
+      "name": "list_empty_hint",
+      "value": "没有匹配的连接"
+    },
+    {
+      "name": "menu_more_actions",
+      "value": "更多操作"
+    },
+    {
+      "name": "menu_edit_connection",
+      "value": "编辑"
+    },
+    {
+      "name": "menu_delete_connection",
+      "value": "删除"
+    },
+    {
+      "name": "del_title",
+      "value": "删除连接"
+    },
+    {
+      "name": "del_message",
+      "value": "该连接及其本地配置文件将被移除。"
+    },
+    {
+      "name": "btn_cancel",
+      "value": "取消"
+    },
+    {
+      "name": "btn_delete",
+      "value": "删除"
+    },
+    {
+      "name": "sheet_edit_title",
+      "value": "编辑连接"
+    },
+    {
+      "name": "field_connection_name",
+      "value": "名称"
+    },
+    {
+      "name": "field_host",
+      "value": "地址"
+    },
+    {
+      "name": "field_port",
+      "value": "端口"
+    },
+    {
+      "name": "field_protocol",
+      "value": "协议"
+    },
+    {
+      "name": "field_transport",
+      "value": "传输方式"
+    },
+    {
+      "name": "field_group",
+      "value": "分组"
+    },
+    {
+      "name": "err_name_required",
+      "value": "连接名称不能为空"
+    },
+    {
+      "name": "err_host_required",
+      "value": "服务器地址不能为空"
+    },
+    {
+      "name": "err_port_invalid",
+      "value": "端口必须是 1 到 65535 之间的数字"
+    },
+    {
+      "name": "msg_conn_saved",
+      "value": "连接已更新"
+    },
+    {
+      "name": "msg_save_failed",
+      "value": "保存失败，已保留原配置"
+    },
+    {
+      "name": "err_config_unreadable",
+      "value": "无法读取该连接的配置文件"
     }
   ]
 }

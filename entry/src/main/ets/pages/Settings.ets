@@ -3,6 +3,8 @@ import { Utils } from '../utils/Common';
 import { ConfigManager } from '../core/config/ConfigManager';
 import { parseCidr, WireGuardSettings } from '../core/config/WgSettings';
 import { TUN_INTERFACE_MTU } from '../core/config/Generation';
+import { FilterListDemo } from './FilterListDemo';
+import { DEBUG } from 'BuildProfile';
 
 const TAG = "Hv2ray-Settings"
 
@@ -256,6 +258,19 @@ export struct Settings {
                 }
                 .alignItems(ItemAlign.Center)
                 .width('100%')
+
+                // The vendored module_filter_list showcase is demo content, kept out of
+                // the configuration list and only reachable from debug builds.
+                if (DEBUG) {
+                    Divider()
+                    Text($r('app.string.demo_section_title'))
+                        .fontSize(18)
+                        .fontWeight(FontWeight.Bold)
+
+                    FilterListDemo()
+                        .width('100%')
+                        .height(320)
+                }
             }
             .alignItems(HorizontalAlign.Start)
             .width('100%')

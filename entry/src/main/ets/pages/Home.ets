@@ -1,5 +1,6 @@
 import { vpnExtension } from '@kit.NetworkKit';
-import { KernelEvent, KernelEventType } from '../utils/Common';
+import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { KernelEvent, KernelEventType, Utils } from '../utils/Common';
 import fs from '@ohos.file.fs';
 import { CommonEventUtils } from '../utils/CommonEventUtils';
 import {
@@ -10,32 +11,83 @@ import {
     prettyPrintBytes
 } from './PageCommon';
 import { VCoreManager } from '../vpn/VCoreManager';
-import { IConnection, IGroup } from '../core/config/ConfigCommon';
-import { ConfigManager } from '../core/config/ConfigManager';
-import { ConfigRoot } from '../core/config/Config';
+import { ConfigManager, ConfigChangeListener } from '../core/config/ConfigManager';
+import { ConfigRoot, StreamObject } from '../core/config/Config';
+import { JsonObject } from '../core/config/ConfigDefs';
+import { Connection } from '../core/config/Connection';
 import Logger from '../utils/Logging';
 import { Want } from '@kit.AbilityKit';
 import { BUNDLE_NAME } from 'BuildProfile';
 import { ConfigurationBuilder } from '../core/config/Generation';
-import { FilterList, FilterOption, LayoutType, ResultItem } from 'module_filter_list';
 
 const TAG = "Hv2ray-HomePage"
 
 /**
  * Navigation 自适应分栏参数：宽度大于 NAV_BAR_WIDTH + MIN_CONTENT_WIDTH 时
  * NavigationMode.Auto 才进入双栏模式，否则自动降级为单栏。
+ * NAV_BAR_MIN/MAX 是双栏下拖动分割线的允许区间；实际可用上限还会被 MIN_CONTENT_WIDTH 夹取。
  */
 const DETAIL_ROUTE = 'homeConnectionDetail';
 const NAV_BAR_WIDTH = 300;
+const NAV_BAR_MIN_WIDTH = 240;
+const NAV_BAR_MAX_WIDTH = 520;
 const MIN_CONTENT_WIDTH = 360;
 
-/** 分组列表的列宽约束：窄屏单列，宽屏/横屏自动多列 */
-const GROUP_LANE_MIN_WIDTH = 280;
-const GROUP_LANE_MAX_WIDTH = 520;
-const GROUP_LANE_GUTTER = 8;
+const MOVE_RADIO_GROUP = 'homeMoveConnectionGroup';
+const SWIPE_ACTION_WIDTH = 80;
+const MAX_PORT = 65535;
+
+/**
+ * 行高、组头高度显式固定，行内容再用 height('100%') 占满它——见 HomeConnectionListItem.rowContent。
+ */
+const ROW_HEIGHT = 48;
+const GROUP_HEADER_HEIGHT = 40;
+
+/** 组内条目间距 / 组与组之间的间距。CARD 样式自身还带外沿，两者叠加才是视觉上的间隔 */
+const GROUP_ITEM_SPACING = 4;
+const GROUP_SECTION_SPACING = 6;
+
+/**
+ * 菜单模态化：点非菜单区域时不再穿透触发下层 ListItem 的点击。
+ * mask 在 2in1 上不生效（系统配置不显示菜单蒙层），所以真正起作用的是 modalMode；
+ * 两者都给，手机/平板上有蒙层，2in1 上靠 modalMode 拦住穿透。
+ */
+const HOME_MENU_OPTIONS: MenuOptions = {
+    modalMode: ModalMode.TARGET_WINDOW,
+    mask: true,
+};
 
 interface HomeDetailParam {
     connectionIdValue: string;
+}
+
+/** 列表渲染用的派生视图，不持久化，只由 ConfigManager 的数据推导 */
+interface HomeConnectionRow {
+    connection: Connection;
+    groupId: string;
+}
+
+interface HomeGroupRow {
+    id: string;
+    name: string;
+    connections: HomeConnectionRow[];
+}
+
+interface HomeGroupOption {
+    id: string;
+    name: string;
+}
+
+@ObservedV2
+class HomeEditDraft {
+    @Trace connId: string = '';
+    @Trace connName: string = '';
+    @Trace hostText: string = '';
+    @Trace portText: string = '';
+    @Trace protocolText: string = '';
+    @Trace transportText: string = '';
+    @Trace groupId: string = '';
+    @Trace groupOptions: HomeGroupOption[] = [];
 }
 
 async function stopKernel(): Promise<void> {
@@ -51,90 +103,27 @@ async function stopKernel(): Promise<void> {
 }
 
 @ComponentV2
-struct IndexAAA {
-    types: string[] = [];
-    styles: string[] = [];
-    @Local typeIndex: number = 0;
-    @Local styleIndex: number = 0;
-    @Local listArr: string[] = [];
-    @Local filterOptions: FilterOption[] = [];
-
-    private resText(name: Resource): string {
-        try {
-            return this.getUIContext()
-                .getHostContext()!
-                .resourceManager
-                .getStringSync(name.id);
-        } catch (error) {
-            Logger.Error(TAG, `failed to load resource ${name.id}: ${JSON.stringify(error)}`);
-            return '';
-        }
-    }
-
-    aboutToAppear(): void {
-        this.types = [
-            this.resText($r('app.string.demo_room_1bed')),
-            this.resText($r('app.string.demo_room_2bed')),
-            this.resText($r('app.string.demo_room_3bed')),
-            this.resText($r('app.string.demo_room_4bed')),
-        ];
-        this.styles = [
-            this.resText($r('app.string.demo_style_wood')),
-            this.resText($r('app.string.demo_style_minimal')),
-            this.resText($r('app.string.demo_style_new_chinese')),
-            this.resText($r('app.string.demo_style_cream')),
-            this.resText($r('app.string.demo_style_wood')),
-            this.resText($r('app.string.demo_style_minimal')),
-            this.resText($r('app.string.demo_style_new_chinese')),
-        ];
-        this.filterOptions = [
-            new FilterOption(this.resText($r('app.string.demo_filter_room_type')), this.typeIndex, this.types),
-            new FilterOption(this.resText($r('app.string.demo_filter_style')), this.styleIndex, this.styles),
-        ];
-    }
-
-    private onFilterListChange(res: ResultItem[]) {
-        while (this.listArr.length > 0) {
-            this.listArr.pop();
-        }
-        Logger.Error(TAG, `!!!!! ${JSON.stringify(res)}`);
-        for (const r of res) {
-            this.listArr.push(`${r.filterName} - ${r.selectIndex}`);
-        }
-    }
+struct HomeEditField {
+    @Require @Param fieldLabel: Resource;
+    @Require @Param fieldValue: string;
+    @Param numericInput: boolean = false;
+    @Event onFieldValue: (value: string) => void = (value: string): void => {
+    };
 
     build() {
-        Column() {
-            FilterList(
-                {
-                    filterOptions: this.filterOptions,
-                    layoutStyle: LayoutType.SPLIT,
-                    onChange: (res: ResultItem[]) => {
-                        this.onFilterListChange(res);
-                    },
-                },
-            ) {
-                List({ space: 12 }) {
-                    ForEach(this.listArr, (item: string, _index: number) => {
-                        ListItem() {
-                            Column({ space: 12 }) {
-                                Image($r('app.media.app_icon'))
-                                    .width('100%')
-                                    .height(140)
-                                    .borderRadius(16)
-                                    .draggable(false)
-
-                                Text(item)
-                            }
-                        }
-                    })
-                }
+        Column({ space: 4 }) {
+            Text(this.fieldLabel)
+                .fontSize(13)
+                .fontColor($r('sys.color.font_secondary'))
+            TextInput({ text: this.fieldValue })
+                .type(this.numericInput ? InputType.Number : InputType.Normal)
                 .width('100%')
-                .height('100%')
-                .padding({ top: 12, right: 16, left: 16 })
-                .layoutWeight(1)
-            }
+                .onChange((value: string): void => {
+                    this.onFieldValue(value);
+                })
         }
+        .alignItems(HorizontalAlign.Start)
+        .width('100%')
     }
 }
 
@@ -346,7 +335,8 @@ struct HomeConnectionDetail {
                 Button(this.isFullVpnValue ? $r('app.string.btn_full_vpn') : $r('app.string.btn_wg_only'))
                     .fontSize(18)
                     .fontWeight(FontWeight.Bold)
-                    .backgroundColor(this.isFullVpnValue ? Color.Green : Color.Blue)
+                    .backgroundColor(this.isFullVpnValue ? $r('sys.color.brand') : $r('sys.color.comp_background_secondary'))
+                    .fontColor(this.isFullVpnValue ? $r('sys.color.font_on_primary') : $r('sys.color.font_primary'))
                     .padding(16)
                     .width('100%')
                     .onClick(async () => {
@@ -358,7 +348,8 @@ struct HomeConnectionDetail {
                 Button(this.kernelStatus === KernelEventType.Started ? $r('app.string.btn_restart') : $r('app.string.btn_start'))
                     .fontSize(18)
                     .fontWeight(FontWeight.Bold)
-                    .backgroundColor(Color.Green)
+                    .backgroundColor($r('sys.color.brand'))
+                    .fontColor($r('sys.color.font_on_primary'))
                     .padding(16)
                     .width('100%')
                     .onClick(async () => {
@@ -388,7 +379,8 @@ struct HomeConnectionDetail {
                     Button($r('app.string.btn_stop'))
                         .fontSize(18)
                         .fontWeight(FontWeight.Bold)
-                        .backgroundColor(Color.Red)
+                        .backgroundColor($r('sys.color.alert'))
+                        .fontColor($r('sys.color.font_on_primary'))
                         .padding(16)
                         .width('100%')
                         .onClick(async () => {
@@ -443,12 +435,137 @@ struct HomeConnectionDetail {
     }
 }
 
+/**
+ * 一行连接。根节点必须是 ListItem：List / ListItemGroup 允许自定义组件，但要求自定义组件
+ * 的顶层就是 ListItem 或 ListItemGroup。
+ *
+ * 菜单与划出操作用**零参 @Builder 按引用**绑定（`bindContextMenu(this.rowMenu, …)`），
+ * 不在属性位置调用带参数的 builder。
+ */
+@ComponentV2
+struct HomeConnectionListItem {
+    @Require @Param row: HomeConnectionRow;
+    @Require @Param isSelected: boolean;
+    @Event onRowOpen: (connectionId: string) => void = (_connectionId: string): void => {
+    };
+    @Event onEditRequested: (row: HomeConnectionRow) => void = (_row: HomeConnectionRow): void => {
+    };
+    @Event onDeleteRequested: (row: HomeConnectionRow) => void = (_row: HomeConnectionRow): void => {
+    };
+
+    @Builder
+    rowMenu() {
+        Menu() {
+            MenuItem({
+                content: $r('app.string.menu_edit_connection'),
+                symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.square_and_pencil'))
+                    .fontColor([$r('sys.color.icon_primary')])
+            })
+                .onClick((): void => {
+                    this.onEditRequested(this.row);
+                })
+
+            MenuItem({
+                content: $r('app.string.menu_delete_connection'),
+                symbolStartIcon: new SymbolGlyphModifier($r('sys.symbol.trash'))
+                    .fontColor([$r('sys.color.alert')])
+            })
+                .onClick((): void => {
+                    this.onDeleteRequested(this.row);
+                })
+        }
+    }
+
+    @Builder
+    swipeDelete() {
+        Row() {
+            SymbolGlyph($r('sys.symbol.trash'))
+                .fontSize(22)
+                .fontColor([$r('sys.color.font_on_primary')])
+        }
+        .justifyContent(FlexAlign.Center)
+        .width(SWIPE_ACTION_WIDTH)
+        .height('100%')
+        .backgroundColor($r('sys.color.alert'))
+        .onClick((): void => {
+            this.onDeleteRequested(this.row);
+        })
+    }
+
+    build() {
+        ListItem({ style: ListItemStyle.CARD }) {
+            this.rowContent()
+        }
+        .height(ROW_HEIGHT)
+        .selected(this.isSelected)
+        .onClick((): void => {
+            this.onRowOpen(this.row.connection.id);
+        })
+        .bindContextMenu(this.rowMenu, ResponseType.LongPress, HOME_MENU_OPTIONS)
+        .swipeAction({
+            end: {
+                builder: (): void => {
+                    this.swipeDelete();
+                },
+                actionAreaDistance: SWIPE_ACTION_WIDTH,
+                onAction: (): void => {
+                    this.onDeleteRequested(this.row);
+                }
+            }
+        })
+    }
+
+    /**
+     * 行内容要占满整行高度并自己做垂直居中。反过来让 ListItem 去“居中一个更矮的子节点”，
+     * 那个 y 偏移是父节点替子节点算的，快滚复用节点后会残留旧值——表现为行内文字上下偏。
+     */
+    @Builder
+    rowContent() {
+        Row({ space: 8 }) {
+            Text(this.row.connection.name)
+                .fontSize(15)
+                .fontColor($r('sys.color.font_primary'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                // 默认按单词断（BREAK_WORD），英文/UUID 这类名字会在最后一个空格处就截掉，右边留一大块空白。
+                // 文档给的按字符截断配方就是 BREAK_ALL + Ellipsis + maxLines。
+                .wordBreak(WordBreak.BREAK_ALL)
+                .layoutWeight(1)
+
+            if (this.isSelected) {
+                SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+                    .fontSize(20)
+                    .fontColor([$r('sys.color.confirm')])
+            }
+
+            SymbolGlyph($r('sys.symbol.ellipsis_circle'))
+                .fontSize(20)
+                .fontColor([$r('sys.color.icon_secondary')])
+                .accessibilityText($r('app.string.menu_more_actions'))
+                .bindMenu(this.rowMenu, HOME_MENU_OPTIONS)
+        }
+        .padding({ left: 8, right: 8 })
+        .width('100%')
+        .height('100%')
+        .alignItems(VerticalAlign.Center)
+        // 鼠标右键走内层 Row，长按由外层 ListItem 承接：同一节点只能绑一个 responseType。
+        .bindContextMenu(this.rowMenu, ResponseType.RightClick, HOME_MENU_OPTIONS)
+    }
+}
+
 @ComponentV2
 export struct Home {
     @Local private pathStack: NavPathStack = new NavPathStack();
     @Local private selectedConnection: string = '';
     @Local private isFullVpn: boolean = false;
     @Local private navMode: NavigationMode = NavigationMode.Stack;
+    @Local private filterKeyword: string = '';
+    @Local private groupRows: HomeGroupRow[] = [];
+    @Local private isEditSheetShown: boolean = false;
+    @Local private editDraft: HomeEditDraft = new HomeEditDraft();
+    private configListener: ConfigChangeListener = (): void => {
+        this.refreshGroupRows();
+    };
 
     async aboutToAppear() {
         CommonEventUtils.subscribeKernelEvent(async (kernelEvent: KernelEvent) => {
@@ -461,9 +578,50 @@ export struct Home {
                     })
                     .catch(() => {
                         Logger.Error(TAG, `show dialog failed!`);
-                    })
+                    });
             }
         });
+
+        ConfigManager.onChanged(this.configListener);
+        this.refreshGroupRows();
+    }
+
+    aboutToDisappear(): void {
+        ConfigManager.offChanged(this.configListener);
+    }
+
+    /**
+     * 左列表是 ConfigManager 数据的派生视图：结构变化（新增/删除/移动分组）通过
+     * 重新推导这份视图来反映，连接名变化由 @Trace 直接刷新对应行。
+     */
+    private refreshGroupRows(): void {
+        const keyword = this.filterKeyword.trim().toLowerCase();
+        const rows: HomeGroupRow[] = [];
+
+        for (const group of Array.from(ConfigManager.allGroups.values())) {
+            const connections: HomeConnectionRow[] = [];
+            for (const connId of group.connections) {
+                const connection = ConfigManager.getConnection(connId);
+                if (!connection) {
+                    Logger.Warn(TAG, `group ${group.id} references unknown connection ${connId}`);
+                    continue;
+                }
+                if (keyword.length > 0 && connection.name.toLowerCase().indexOf(keyword) < 0) {
+                    continue;
+                }
+                const row: HomeConnectionRow = { connection: connection, groupId: group.id };
+                connections.push(row);
+            }
+
+            if (keyword.length > 0 && connections.length === 0) {
+                continue;
+            }
+
+            const groupRow: HomeGroupRow = { id: group.id, name: group.name, connections: connections };
+            rows.push(groupRow);
+        }
+
+        this.groupRows = rows;
     }
 
     private showDetail(connectionId: string): void {
@@ -488,6 +646,190 @@ export struct Home {
         if (mode === NavigationMode.Split && this.pathStack.size() === 0) {
             this.showDetail(this.selectedConnection);
         }
+    }
+
+    private textOf(name: Resource): string {
+        try {
+            return this.getUIContext()
+                .getHostContext()!
+                .resourceManager
+                .getStringSync(name.id);
+        } catch (error) {
+            Logger.Error(TAG, `failed to load resource ${name.id}: ${JSON.stringify(error)}`);
+            return '';
+        }
+    }
+
+    private async showFormError(message: ResourceStr): Promise<void> {
+        await this.getUIContext()
+            .getPromptAction()
+            .showDialog({ message: message })
+            .catch(() => {
+                Logger.Error(TAG, `show dialog failed!`);
+            });
+    }
+
+    private confirmDeleteConnection(row: HomeConnectionRow): void {
+        const title = `${this.textOf($r('app.string.del_title'))}: ${row.connection.name}`;
+        this.getUIContext()
+            .showAlertDialog({
+                title: title,
+                message: $r('app.string.del_message'),
+                primaryButton: {
+                    value: $r('app.string.btn_cancel'),
+                    action: (): void => {
+                    }
+                },
+                secondaryButton: {
+                    value: $r('app.string.btn_delete'),
+                    action: (): void => {
+                        this.doDeleteConnection(row);
+                    }
+                }
+            });
+    }
+
+    private async doDeleteConnection(row: HomeConnectionRow): Promise<void> {
+        const removed = await ConfigManager.removeConnection(row.connection.id);
+        if (!removed) {
+            await this.showFormError($r('app.string.msg_save_failed'));
+            return;
+        }
+
+        if (this.selectedConnection === row.connection.id) {
+            this.selectedConnection = '';
+            if (this.navMode === NavigationMode.Split) {
+                // 双栏下右侧不能留空，换成空选中态的详情页。
+                this.showDetail('');
+            } else if (this.pathStack.size() > 0) {
+                this.pathStack.pop();
+            }
+        }
+        this.refreshGroupRows();
+    }
+
+    private async openEditSheet(row: HomeConnectionRow): Promise<void> {
+        const draft = this.editDraft;
+        draft.connId = row.connection.id;
+        draft.connName = row.connection.name;
+        draft.groupId = row.groupId;
+        draft.hostText = '';
+        draft.portText = '';
+        draft.protocolText = '';
+        draft.transportText = '';
+
+        const options: HomeGroupOption[] = [];
+        for (const group of Array.from(ConfigManager.allGroups.values())) {
+            const option: HomeGroupOption = { id: group.id, name: group.name };
+            options.push(option);
+        }
+        draft.groupOptions = options;
+
+        const root = await ConfigManager.loadConnectionFromFile(row.connection.id);
+        if (!root || !root.outbounds || root.outbounds.length === 0) {
+            Logger.Error(TAG, `connection ${row.connection.id} has no outbound to edit`);
+            await this.showFormError($r('app.string.err_config_unreadable'));
+            return;
+        }
+
+        const outbound = root.outbounds[0];
+        draft.protocolText = outbound.protocol ?? '';
+        draft.transportText = outbound.streamSettings?.transport ?? '';
+        const settings = outbound.settings;
+        if (settings) {
+            const address = settings['address'];
+            const port = settings['port'];
+            draft.hostText = typeof address === 'string' ? address : '';
+            if (typeof port === 'number') {
+                draft.portText = port.toString();
+            } else if (typeof port === 'string') {
+                draft.portText = port;
+            }
+        }
+
+        this.isEditSheetShown = true;
+    }
+
+    private async saveEditDraft(): Promise<void> {
+        const draft = this.editDraft;
+        const connId = draft.connId;
+        if (connId.length === 0) {
+            this.isEditSheetShown = false;
+            return;
+        }
+
+        const name = draft.connName.trim();
+        if (name.length === 0) {
+            await this.showFormError($r('app.string.err_name_required'));
+            return;
+        }
+
+        const portText = draft.portText.trim();
+        if (!Utils.isUnsignedDecimal(portText)) {
+            await this.showFormError($r('app.string.err_port_invalid'));
+            return;
+        }
+        const portValue = parseInt(portText);
+        if (portValue <= 0 || portValue > MAX_PORT) {
+            await this.showFormError($r('app.string.err_port_invalid'));
+            return;
+        }
+
+        const host = draft.hostText.trim();
+        if (host.length === 0) {
+            await this.showFormError($r('app.string.err_host_required'));
+            return;
+        }
+
+        if (!await ConfigManager.renameConnection(connId, name)) {
+            await this.showFormError($r('app.string.msg_save_failed'));
+            return;
+        }
+
+        const currentGroup = ConfigManager.getGroupOfConnection(connId);
+        if (!currentGroup || currentGroup.id !== draft.groupId) {
+            if (!await ConfigManager.moveConnection(connId, draft.groupId)) {
+                await this.showFormError($r('app.string.msg_save_failed'));
+                return;
+            }
+        }
+
+        const root = await ConfigManager.loadConnectionFromFile(connId);
+        if (root && root.outbounds && root.outbounds.length > 0) {
+            const outbound = root.outbounds[0];
+            const protocol = draft.protocolText.trim();
+            if (protocol.length > 0) {
+                outbound.protocol = protocol;
+            }
+            if (outbound.settings === undefined) {
+                outbound.settings = new JsonObject();
+            }
+            outbound.settings['address'] = host;
+            outbound.settings['port'] = portValue;
+
+            const transport = draft.transportText.trim();
+            if (transport.length > 0) {
+                if (outbound.streamSettings === undefined) {
+                    outbound.streamSettings = new StreamObject();
+                }
+                outbound.streamSettings.transport = transport;
+            }
+
+            if (!await ConfigManager.updateConnectionContent(connId, root)) {
+                await this.showFormError($r('app.string.msg_save_failed'));
+                return;
+            }
+        }
+
+        this.isEditSheetShown = false;
+        try {
+            this.getUIContext()
+                .getPromptAction()
+                .showToast({ message: $r('app.string.msg_conn_saved') });
+        } catch (error) {
+            Logger.Error(TAG, `failed to show saved toast: ${JSON.stringify(error)}`);
+        }
+        this.refreshGroupRows();
     }
 
     @Builder
@@ -519,57 +861,131 @@ export struct Home {
     }
 
     @Builder
-    connectionItem(conn: IConnection | undefined) {
-        Row() {
-            if (conn) {
-                Button(conn.name)
-                    .width('100%')
-                    .onClick(() => {
-                        this.showDetail(conn.id);
+    groupHeader(groupRow: HomeGroupRow) {
+        Row({ space: 8 }) {
+            Text(groupRow.name)
+                .fontSize(16)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('sys.color.font_primary'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .wordBreak(WordBreak.BREAK_ALL)
+                .layoutWeight(1)
+            Text(`${groupRow.connections.length}`)
+                .fontSize(12)
+                .fontColor($r('sys.color.font_tertiary'))
+        }
+        .padding({ left: 8, right: 8 })
+        .width('100%')
+        .height(GROUP_HEADER_HEIGHT)
+    }
+
+    @Builder
+    editSheetGroupOptions() {
+        Row({ space: 16 }) {
+            ForEach(this.editDraft.groupOptions, (option: HomeGroupOption) => {
+                Row({ space: 4 }) {
+                    Radio({
+                        value: option.id,
+                        group: MOVE_RADIO_GROUP
                     })
-                    .backgroundColor(this.selectedConnection === conn.id ? Color.Red : undefined)
-            } else {
-                Text($r('app.string.invalid_option'))
-            }
+                        .checked(this.editDraft.groupId === option.id)
+                        .onChange((isChecked: boolean): void => {
+                            if (isChecked) {
+                                this.editDraft.groupId = option.id;
+                            }
+                        })
+
+                    Text(option.name)
+                        .fontSize(14)
+                }
+            }, (option: HomeGroupOption): string => option.id)
         }
         .width('100%')
     }
 
     @Builder
-    groupItem(group: IGroup) {
-        Column() {
-            Row() {
-                Text(group.name)
-                    .fontSize(18)
-                    .fontWeight(FontWeight.Bold)
-                    .margin({ left: 8 })
-                Button($r('app.string.btn_edit'))
+    editSheet() {
+        Column({ space: 12 }) {
+            Scroll() {
+                Column({ space: 12 }) {
+                    HomeEditField({
+                        fieldLabel: $r('app.string.field_connection_name'),
+                        fieldValue: this.editDraft.connName,
+                        onFieldValue: (value: string): void => {
+                            this.editDraft.connName = value;
+                        },
+                    })
+
+                    HomeEditField({
+                        fieldLabel: $r('app.string.field_host'),
+                        fieldValue: this.editDraft.hostText,
+                        onFieldValue: (value: string): void => {
+                            this.editDraft.hostText = value;
+                        },
+                    })
+
+                    HomeEditField({
+                        fieldLabel: $r('app.string.field_port'),
+                        fieldValue: this.editDraft.portText,
+                        numericInput: true,
+                        onFieldValue: (value: string): void => {
+                            this.editDraft.portText = value;
+                        },
+                    })
+
+                    HomeEditField({
+                        fieldLabel: $r('app.string.field_protocol'),
+                        fieldValue: this.editDraft.protocolText,
+                        onFieldValue: (value: string): void => {
+                            this.editDraft.protocolText = value;
+                        },
+                    })
+
+                    HomeEditField({
+                        fieldLabel: $r('app.string.field_transport'),
+                        fieldValue: this.editDraft.transportText,
+                        onFieldValue: (value: string): void => {
+                            this.editDraft.transportText = value;
+                        },
+                    })
+
+                    Text($r('app.string.field_group'))
+                        .fontSize(13)
+                        .fontColor($r('sys.color.font_secondary'))
+
+                    this.editSheetGroupOptions();
+                }
+                .width('100%')
             }
-            .borderRadius(8)
-            .padding(8)
-            .justifyContent(FlexAlign.SpaceBetween)
-            .backgroundColor($r('sys.color.gray_03'))
-            .height(48)
+            .layoutWeight(1)
             .width('100%')
 
-            // 原先这里是内嵌的 List.height(300)：固定高度 + 外层列表里再套滚动容器，
-            // 窄屏下既不能完整显示也没法自适应。改为随内容增高的 Column，
-            // 多列能力交给外层分组列表的 lanes（按容器宽度自动分列）。
-            Column({ space: 8 }) {
-                ForEach(group.connections, (connId: string) => {
-                    this.connectionItem(ConfigManager.getConnection(connId));
-                }, (connId: string) => connId)
+            Row({ space: 8 }) {
+                Button($r('app.string.btn_cancel'))
+                    .layoutWeight(1)
+                    .onClick((): void => {
+                        this.isEditSheetShown = false;
+                    })
+
+                Button($r('app.string.btn_save'))
+                    .layoutWeight(1)
+                    .onClick((): void => {
+                        this.saveEditDraft();
+                    })
             }
-            .padding({ left: 8, right: 8, top: 8, bottom: 8 })
             .width('100%')
         }
+        .padding(16)
+        .width('100%')
+        .height('100%')
     }
 
     @Builder
     addSomethingButton() {
         Button({ type: ButtonType.Circle }) {
             SymbolGlyph($r('sys.symbol.plus'))
-                .fontColor([$r('sys.color.font_primary')])
+                .fontColor([$r('sys.color.font_on_primary')])
                 .fontSize(24)
         }
         .backgroundColor($r('sys.color.brand'))
@@ -579,24 +995,60 @@ export struct Home {
 
     build() {
         Navigation(this.pathStack) {
-            Column() {
+            Column({ space: 4 }) {
                 this.kernelStatusSummary();
 
-                // list all groups
-                List({ space: 8 }) {
-                    ForEach(Array.from(ConfigManager.allGroups.values()), (group: IGroup) => {
-                        ListItem() {
-                            this.groupItem(group);
-                        }
-                    }, (group: IGroup) => group.id)
-
-                    ListItem() {
-                        IndexAAA()
-                            .width('100%')
-                    }
+                Search({ placeholder: $r('app.string.list_search_hint'), value: this.filterKeyword })
                     .width('100%')
+                    .onChange((value: string): void => {
+                        this.filterKeyword = value;
+                        this.refreshGroupRows();
+                    })
+                    .onSubmit((value: string): void => {
+                        this.filterKeyword = value;
+                        this.refreshGroupRows();
+                    })
+
+                if (this.groupRows.length === 0) {
+                    Text($r('app.string.list_empty_hint'))
+                        .fontSize(13)
+                        .fontColor($r('sys.color.font_tertiary'))
+                        .padding(8)
                 }
-                .lanes({ minLength: GROUP_LANE_MIN_WIDTH, maxLength: GROUP_LANE_MAX_WIDTH }, GROUP_LANE_GUTTER)
+
+                // 分组列表：组头吸顶，组用 CARD 样式分卡。
+                // 左栏宽度被 NAV_BAR_MAX_WIDTH 限制住，这里始终是单列，所以不开 lanes；
+                // 行高固定（ROW_HEIGHT），List 对屏外条目按统一高度排布，不需要 childrenMainSize。
+                List({ space: GROUP_SECTION_SPACING }) {
+                    Repeat(this.groupRows)
+                        .each((groupItem: RepeatItem<HomeGroupRow>) => {
+                            ListItemGroup({
+                                header: this.groupHeader(groupItem.item),
+                                space: GROUP_ITEM_SPACING,
+                                style: ListItemGroupStyle.CARD
+                            }) {
+                                Repeat(groupItem.item.connections)
+                                    .each((connectionItem: RepeatItem<HomeConnectionRow>) => {
+                                        HomeConnectionListItem({
+                                            row: connectionItem.item,
+                                            isSelected: this.selectedConnection === connectionItem.item.connection.id,
+                                            onRowOpen: (connectionId: string): void => {
+                                                this.showDetail(connectionId);
+                                            },
+                                            onEditRequested: (row: HomeConnectionRow): void => {
+                                                this.openEditSheet(row);
+                                            },
+                                            onDeleteRequested: (row: HomeConnectionRow): void => {
+                                                this.confirmDeleteConnection(row);
+                                            },
+                                        })
+                                    })
+                                    .key((item: HomeConnectionRow): string => item.connection.id)
+                            }
+                        })
+                        .key((item: HomeGroupRow): string => item.id)
+                }
+                .sticky(StickyStyle.Header)
                 .layoutWeight(1)
 
                 Row() {
@@ -607,14 +1059,22 @@ export struct Home {
                 .width('100%')
                 .position({ bottom: '20vp' })
             }
-            .backgroundColor($r('sys.color.gray_02'))
+            .backgroundColor($r('sys.color.background_secondary'))
             .padding(8)
             .width('100%')
             .height('100%')
+            .bindSheet($$this.isEditSheetShown, this.editSheet, {
+                detents: [SheetSize.MEDIUM, SheetSize.LARGE],
+                dragBar: true,
+                showClose: true,
+                title: { title: $r('app.string.sheet_edit_title') }
+            })
         }
         .navDestination(this.detailPageMap)
         .mode(NavigationMode.Auto)
         .navBarWidth(NAV_BAR_WIDTH)
+        // 只设 navBarWidth 时分割线不可拖；给了区间就能拖拽调宽（双栏模式生效）。
+        .navBarWidthRange([NAV_BAR_MIN_WIDTH, NAV_BAR_MAX_WIDTH])
         .minContentWidth(MIN_CONTENT_WIDTH)
         .hideTitleBar(true)
         .onNavigationModeChange((mode: NavigationMode): void => {

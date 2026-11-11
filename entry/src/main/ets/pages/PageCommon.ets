@@ -71,12 +71,12 @@ export class GuiKernelStatusObject {
 let kernelStatusObject = new GuiKernelStatusObject();
 export { kernelStatusObject as GlobalKernelStatus };
 
-export function kernelStatusColor(status: KernelEventType): Color {
+export function kernelStatusColor(status: KernelEventType): ResourceColor {
     switch (status) {
-        case KernelEventType.Starting: return Color.Yellow;
-        case KernelEventType.Started: return Color.Green;
-        case KernelEventType.Crashed: return Color.Red;
-        case KernelEventType.Stopped: return Color.Blue;
+        case KernelEventType.Starting: return $r('sys.color.warning');
+        case KernelEventType.Started: return $r('sys.color.confirm');
+        case KernelEventType.Crashed: return $r('sys.color.alert');
+        case KernelEventType.Stopped: return $r('sys.color.icon_tertiary');
     }
 }
 

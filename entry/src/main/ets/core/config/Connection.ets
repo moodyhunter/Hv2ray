@@ -1,9 +1,10 @@
 import { ISerializable } from "../common/ISerializable";
 import { ConfigMetadata } from "./ConfigMetadata";
 
+@ObservedV2
 export class Connection extends ISerializable {
     id: string = '<unknown>';
-    name: string = '<unknown>';
+    @Trace name: string = '<unknown>';
     metadata: ConfigMetadata = new ConfigMetadata();
 
     constructor() {

@@ -255,6 +255,98 @@
     {
       "name": "demo_style_cream",
       "value": "Cream"
+    },
+    {
+      "name": "demo_section_title",
+      "value": "Filter list demo"
+    },
+    {
+      "name": "list_search_hint",
+      "value": "Filter connections"
+    },
+    {
+      "name": "list_empty_hint",
+      "value": "No matching connection"
+    },
+    {
+      "name": "menu_more_actions",
+      "value": "More actions"
+    },
+    {
+      "name": "menu_edit_connection",
+      "value": "Edit"
+    },
+    {
+      "name": "menu_delete_connection",
+      "value": "Delete"
+    },
+    {
+      "name": "del_title",
+      "value": "Delete connection"
+    },
+    {
+      "name": "del_message",
+      "value": "The connection and its local configuration file will be removed."
+    },
+    {
+      "name": "btn_cancel",
+      "value": "Cancel"
+    },
+    {
+      "name": "btn_delete",
+      "value": "Delete"
+    },
+    {
+      "name": "sheet_edit_title",
+      "value": "Edit connection"
+    },
+    {
+      "name": "field_connection_name",
+      "value": "Name"
+    },
+    {
+      "name": "field_host",
+      "value": "Address"
+    },
+    {
+      "name": "field_port",
+      "value": "Port"
+    },
+    {
+      "name": "field_protocol",
+      "value": "Protocol"
+    },
+    {
+      "name": "field_transport",
+      "value": "Transport"
+    },
+    {
+      "name": "field_group",
+      "value": "Group"
+    },
+    {
+      "name": "err_name_required",
+      "value": "The connection name must not be empty"
+    },
+    {
+      "name": "err_host_required",
+      "value": "The server address must not be empty"
+    },
+    {
+      "name": "err_port_invalid",
+      "value": "Port must be a number between 1 and 65535"
+    },
+    {
+      "name": "msg_conn_saved",
+      "value": "Connection updated"
+    },
+    {
+      "name": "msg_save_failed",
+      "value": "Failed to save, the previous configuration is kept"
+    },
+    {
+      "name": "err_config_unreadable",
+      "value": "Cannot read this connection's configuration file"
     }
   ]
 }
