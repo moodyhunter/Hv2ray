@@ -343,6 +343,70 @@
     {
       "name": "err_config_unreadable",
       "value": "无法读取该连接的配置文件"
+    },
+    {
+      "name": "backup_section_title",
+      "value": "备份与还原"
+    },
+    {
+      "name": "backup_note",
+      "value": "备份会把所有分组、连接和 WireGuard 设置写进一个 JSON 文件；还原会覆盖本机的当前配置。"
+    },
+    {
+      "name": "btn_backup",
+      "value": "导出备份"
+    },
+    {
+      "name": "btn_restore",
+      "value": "还原"
+    },
+    {
+      "name": "restore_confirm_title",
+      "value": "还原备份"
+    },
+    {
+      "name": "restore_confirm_message",
+      "value": "当前的分组、连接和设置会被替换。"
+    },
+    {
+      "name": "btn_replace",
+      "value": "覆盖"
+    },
+    {
+      "name": "msg_backup_done",
+      "value": "备份文件已写入"
+    },
+    {
+      "name": "msg_restore_done",
+      "value": "配置已还原"
+    },
+    {
+      "name": "msg_restore_partial",
+      "value": "已还原，但有警告，详见日志"
+    },
+    {
+      "name": "msg_backup_failed",
+      "value": "备份失败"
+    },
+    {
+      "name": "err_backup_not_json",
+      "value": "所选文件不是有效的 JSON"
+    },
+    {
+      "name": "err_backup_not_ours",
+      "value": "所选文件不是 Hv2ray 的备份文件"
+    },
+    {
+      "name": "err_backup_too_new",
+      "value": "该备份由更高版本创建，当前版本无法读取"
+    },
+    {
+      "name": "err_backup_too_old",
+      "value": "该备份的格式过旧，已不再支持"
+    },
+    {
+      "name": "err_backup_no_groups",
+      "value": "备份中没有可还原的配置"
     }
   ]
 }

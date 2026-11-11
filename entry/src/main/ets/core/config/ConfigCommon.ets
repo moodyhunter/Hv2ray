@@ -22,7 +22,7 @@ function decodeText(arrayBufer: ArrayBuffer): string {
     return decoder.decodeToString(new Uint8Array(arrayBufer));
 }
 
-async function readFullFile(filePath: string): Promise<string | undefined> {
+export async function readFullFile(filePath: string): Promise<string | undefined> {
     let buffer: ArrayBuffer;
     try {
         const file = await fs.open(filePath, fs.OpenMode.READ_ONLY);
@@ -75,6 +75,10 @@ export async function saveToFile<T>(t: T, filePath: string): Promise<boolean> {
     } else {
         content = JSON.stringify(t, undefined, 2);
     }
+    return await writeTextFile(content, filePath);
+}
+
+export async function writeTextFile(content: string, filePath: string): Promise<boolean> {
     try {
         const file = await fs.open(filePath, fs.OpenMode.WRITE_ONLY | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
         await fs.write(file.fd, content);

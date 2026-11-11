@@ -5,6 +5,14 @@ import { parseCidr, WireGuardSettings } from '../core/config/WgSettings';
 import { TUN_INTERFACE_MTU } from '../core/config/Generation';
 import { FilterListDemo } from './FilterListDemo';
 import { DEBUG } from 'BuildProfile';
+import { picker } from '@kit.CoreFileKit';
+import common from '@ohos.app.ability.common';
+import {
+    BACKUP_FILE_SUFFIX,
+    BackupIssueCode,
+    suggestBackupFileName
+} from '../core/backup/BackupModel';
+import { exportBackupToUri, IBackupRunResult, importBackupFromUri } from '../core/backup/BackupStore';
 
 const TAG = "Hv2ray-Settings"
 
@@ -22,6 +30,8 @@ export struct Settings {
     @Local private wgMtu: string = '';
     @Local private wgKeepalive: string = '';
     @Local private wgRoutes: string = '';
+    /** 备份/还原要走文件选择器，期间禁用按钮，避免并发跑两次。 */
+    @Local private isBackupBusy: boolean = false;
 
     aboutToAppear(): void {
         Logger.Info(TAG, `aboutToAppear`);
@@ -167,6 +177,156 @@ export struct Settings {
         this.notifySaved();
     }
 
+    /** 失败时按问题码取本地文案，detail 只进日志。 */
+    private backupFailureText(result: IBackupRunResult): ResourceStr {
+        for (const issue of result.issues) {
+            if (!issue.fatal) {
+                continue;
+            }
+            switch (issue.code) {
+                case BackupIssueCode.NotJson:
+                    return $r('app.string.err_backup_not_json');
+                case BackupIssueCode.NotABackup:
+                    return $r('app.string.err_backup_not_ours');
+                case BackupIssueCode.FormatTooNew:
+                    return $r('app.string.err_backup_too_new');
+                case BackupIssueCode.FormatTooOld:
+                    return $r('app.string.err_backup_too_old');
+                case BackupIssueCode.NoGroupsFile:
+                    return $r('app.string.err_backup_no_groups');
+                default:
+                    return $r('app.string.msg_backup_failed');
+            }
+        }
+        return $r('app.string.msg_backup_failed');
+    }
+
+    private logBackupIssues(result: IBackupRunResult): void {
+        for (const issue of result.issues) {
+            Logger.Warn(TAG, `backup ${issue.code}: ${issue.detail}`);
+        }
+    }
+
+    private showToast(message: ResourceStr): void {
+        try {
+            this.getUIContext()
+                .getPromptAction()
+                .showToast({ message: message });
+        } catch (error) {
+            Logger.Error(TAG, `failed to show toast: ${JSON.stringify(error)}`);
+        }
+    }
+
+    /** 文件选择器需要宿主上下文，拿不到时按失败处理。 */
+    private pickerContext(): common.Context | undefined {
+        return this.getUIContext()
+            .getHostContext();
+    }
+
+    private async doBackup(): Promise<void> {
+        const context = this.pickerContext();
+        if (context === undefined) {
+            Logger.Error(TAG, 'no host context, cannot open the document picker');
+            await this.showFormError($r('app.string.msg_backup_failed'));
+            return;
+        }
+
+        try {
+            const saveOptions = new picker.DocumentSaveOptions();
+            saveOptions.newFileNames = [suggestBackupFileName(Date.now())];
+            saveOptions.fileSuffixChoices = [BACKUP_FILE_SUFFIX];
+            const uris = await new picker.DocumentViewPicker(context)
+                .save(saveOptions);
+            if (uris.length === 0) {
+                return;
+            }
+
+            const result = await exportBackupToUri(uris[0]);
+            this.logBackupIssues(result);
+            if (!result.ok) {
+                Logger.Error(TAG, `backup failed: ${result.reason}`);
+                await this.showFormError(this.backupFailureText(result));
+                return;
+            }
+            Logger.Info(TAG, `backup done, ${result.groupCount} group(s), ${result.connectionCount} connection(s)`);
+            this.showToast($r('app.string.msg_backup_done'));
+        } catch (error) {
+            Logger.Error(TAG, `backup failed: ${JSON.stringify(error)}`);
+            await this.showFormError($r('app.string.msg_backup_failed'));
+        }
+    }
+
+    private async doRestore(): Promise<void> {
+        const context = this.pickerContext();
+        if (context === undefined) {
+            Logger.Error(TAG, 'no host context, cannot open the document picker');
+            await this.showFormError($r('app.string.msg_backup_failed'));
+            return;
+        }
+
+        try {
+            const selectOptions = new picker.DocumentSelectOptions();
+            selectOptions.maxSelectNumber = 1;
+            selectOptions.fileSuffixFilters = [BACKUP_FILE_SUFFIX];
+            const uris = await new picker.DocumentViewPicker(context)
+                .select(selectOptions);
+            if (uris.length === 0) {
+                return;
+            }
+            this.confirmRestore(uris[0]);
+        } catch (error) {
+            Logger.Error(TAG, `restore failed: ${JSON.stringify(error)}`);
+            await this.showFormError($r('app.string.msg_backup_failed'));
+        }
+    }
+
+    /** 还原会覆盖本机配置，确认之后再动手。 */
+    private confirmRestore(uri: string): void {
+        this.getUIContext()
+            .showAlertDialog({
+                title: $r('app.string.restore_confirm_title'),
+                message: $r('app.string.restore_confirm_message'),
+                primaryButton: {
+                    value: $r('app.string.btn_cancel'),
+                    action: (): void => {
+                    }
+                },
+                secondaryButton: {
+                    value: $r('app.string.btn_replace'),
+                    action: (): void => {
+                        this.runRestore(uri);
+                    }
+                }
+            });
+    }
+
+    private async runRestore(uri: string): Promise<void> {
+        if (this.isBackupBusy) {
+            return;
+        }
+        this.isBackupBusy = true;
+
+        try {
+            const result = await importBackupFromUri(uri);
+            this.logBackupIssues(result);
+            if (!result.ok) {
+                Logger.Error(TAG, `restore failed: ${result.reason}`);
+                await this.showFormError(this.backupFailureText(result));
+                return;
+            }
+            Logger.Info(TAG, `restore done, ${result.groupCount} group(s), ${result.connectionCount} connection(s)`);
+            this.loadFromManager();
+            this.showToast(result.issues.length > 0
+                ? $r('app.string.msg_restore_partial')
+                : $r('app.string.msg_restore_done'));
+        } catch (error) {
+            Logger.Error(TAG, `restore failed: ${JSON.stringify(error)}`);
+            await this.showFormError($r('app.string.msg_backup_failed'));
+        } finally {
+            this.isBackupBusy = false;
+        }
+    }
+
     build() {
         Scroll() {
             Column({ space: 16 }) {
@@ -261,6 +421,44 @@ export struct Settings {
                     }
                 }
                 .alignItems(ItemAlign.Center)
+                .width('100%')
+
+                Divider()
+                Text($r('app.string.backup_section_title'))
+                    .fontSize(18)
+                    .fontWeight(FontWeight.Bold)
+
+                Text($r('app.string.backup_note'))
+                    .fontSize(13)
+                    .fontColor($r('sys.color.font_tertiary'))
+
+                // 文件选择器和写文件都是异步的，busy 期间禁用按钮，避免同时跑两份。
+                GridRow({
+                    gutter: { x: 8, y: 8 },
+                    columns: 12,
+                    breakpoints: { reference: BreakpointsReference.ComponentSize }
+                }) {
+                    GridCol({ span: { xs: 6, sm: 6, md: 4, lg: 4 } }) {
+                        Button($r('app.string.btn_backup'))
+                            .width('100%')
+                            .enabled(!this.isBackupBusy)
+                            .onClick(async () => {
+                                this.isBackupBusy = true;
+                                await this.doBackup();
+                                this.isBackupBusy = false;
+                            })
+                    }
+                    GridCol({ span: { xs: 6, sm: 6, md: 4, lg: 4 } }) {
+                        Button($r('app.string.btn_restore'))
+                            .width('100%')
+                            .enabled(!this.isBackupBusy)
+                            .onClick(async () => {
+                                this.isBackupBusy = true;
+                                await this.doRestore();
+                                this.isBackupBusy = false;
+                            })
+                    }
+                }
                 .width('100%')
 
                 // The vendored module_filter_list showcase is demo content, kept out of

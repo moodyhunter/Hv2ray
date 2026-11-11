@@ -347,6 +347,70 @@
     {
       "name": "err_config_unreadable",
       "value": "Cannot read this connection's configuration file"
+    },
+    {
+      "name": "backup_section_title",
+      "value": "Backup & restore"
+    },
+    {
+      "name": "backup_note",
+      "value": "Backing up writes every group, connection and WireGuard setting into one JSON file. Restoring replaces what is on this device."
+    },
+    {
+      "name": "btn_backup",
+      "value": "Back up"
+    },
+    {
+      "name": "btn_restore",
+      "value": "Restore"
+    },
+    {
+      "name": "restore_confirm_title",
+      "value": "Restore backup"
+    },
+    {
+      "name": "restore_confirm_message",
+      "value": "The current groups, connections and settings will be replaced."
+    },
+    {
+      "name": "btn_replace",
+      "value": "Replace"
+    },
+    {
+      "name": "msg_backup_done",
+      "value": "Backup file written"
+    },
+    {
+      "name": "msg_restore_done",
+      "value": "Configuration restored"
+    },
+    {
+      "name": "msg_restore_partial",
+      "value": "Restored with warnings, see the log for details"
+    },
+    {
+      "name": "msg_backup_failed",
+      "value": "Backup failed"
+    },
+    {
+      "name": "err_backup_not_json",
+      "value": "The selected file is not valid JSON"
+    },
+    {
+      "name": "err_backup_not_ours",
+      "value": "The selected file is not a Hv2ray backup"
+    },
+    {
+      "name": "err_backup_too_new",
+      "value": "This backup was made by a newer version and cannot be read"
+    },
+    {
+      "name": "err_backup_too_old",
+      "value": "This backup format is no longer supported"
+    },
+    {
+      "name": "err_backup_no_groups",
+      "value": "The backup holds no configuration to restore"
     }
   ]
 }

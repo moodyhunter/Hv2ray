@@ -8,12 +8,10 @@ import { Ctor } from "../common/SerializableTypes";
 import { ISerializable } from "../common/ISerializable";
 import { Connection } from "./Connection";
 import { WireGuardSettings } from "./WgSettings";
+import { CONNECTIONS_DIR, GROUPS_FILE, SETTINGS_FILE } from "../backup/BackupModel";
 
 const TAG = 'config/ConfigManager';
 const CONFIG_FILES_PATH_PREFIX = DEBUG ? 'config-debug' : 'config';
-const CONNECTIONS_PATH_DIR = 'connections';
-const CONFIG_FILE = 'groups.json';
-const SETTINGS_FILE = 'settings.json';
 
 class Hv2rayConfigRoot extends ISerializable {
     groups: IGroup[];
@@ -100,14 +98,19 @@ export class ConfigManagerImpl {
     }
 
     private get connectionsDir(): string {
-        return this.configPathBase + '/' + CONNECTIONS_PATH_DIR;
+        return this.configPathBase + '/' + CONNECTIONS_DIR;
+    }
+
+    /** 配置目录的绝对路径，备份/还原在这里读写配置文件。 */
+    public get configDirPath(): string {
+        return this.configPathBase;
     }
 
     public async loadConfigurations(): Promise<void> {
         this.safeMkdir(this.configPathBase);
         this.safeMkdir(this.connectionsDir);
 
-        let root = await this.loadConfigFromFile(Hv2rayConfigRoot, CONFIG_FILE);
+        let root = await this.loadConfigFromFile(Hv2rayConfigRoot, GROUPS_FILE);
         if (root) {
             for (let group of root.groups) {
                 this.groups.set(group.id, group);
@@ -126,6 +129,18 @@ export class ConfigManagerImpl {
         }
 
         this.ensureDefaultGroups();
+    }
+
+    /**
+     * 从磁盘重新读一遍配置。还原备份之后用它把新数据推进内存，
+     * 并通知所有持有派生视图的界面重建。
+     */
+    public async reloadConfigurations(): Promise<void> {
+        this.groups.clear();
+        this.connections.clear();
+        this.wgSettings = new WireGuardSettings();
+        await this.loadConfigurations();
+        this.notifyChanged();
     }
 
     private ensureDefaultGroups() {
@@ -295,7 +310,7 @@ export class ConfigManagerImpl {
         let root = new Hv2rayConfigRoot();
         root.groups = Array.from(this.groups.values());
         root.connections = Array.from(this.connections.values());
-        return await this.writeConfigToFile(root, CONFIG_FILE);
+        return await this.writeConfigToFile(root, GROUPS_FILE);
     }
 
     public async saveWireGuardSettings(settings: WireGuardSettings): Promise<boolean> {
