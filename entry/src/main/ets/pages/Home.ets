@@ -1,5 +1,5 @@
 import { vpnExtension } from '@kit.NetworkKit';
-import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { SymbolGlyphModifier, TextModifier } from '@kit.ArkUI';
 import { KernelEvent, KernelEventType, Utils } from '../utils/Common';
 import fs from '@ohos.file.fs';
 import { CommonEventUtils } from '../utils/CommonEventUtils';
@@ -38,12 +38,13 @@ const MOVE_RADIO_GROUP = 'homeMoveConnectionGroup';
 const MAX_PORT = 65535;
 
 /**
- * 行高、组头高度显式固定，行内容再用 height('100%') 占满它——见 HomeConnectionListItem.rowContent。
+ * 行高与组头高度显式固定；HdsListItemCard 用 cardHeight/cardWidth 等于这个尺寸，
+ * 这样 HDS 画在 ListItem 层的选中背景不会被卡片露出来一圈。
  */
 const ROW_HEIGHT = 48;
 const GROUP_HEADER_HEIGHT = 40;
 
-/** 组内条目间距 / 组与组之间的间距。CARD 样式自身还带外沿，两者叠加才是视觉上的间隔 */
+/** 卡片间距：组内 4vp，组之间 6vp。分组不再用 CARD 样式，所以这两个值就是全部的间隔 */
 const GROUP_ITEM_SPACING = 4;
 const GROUP_SECTION_SPACING = 6;
 
@@ -439,6 +440,19 @@ struct HomeConnectionDetail {
 }
 
 /**
+ * HDS 的文本槽只接受 `TextOptions { text, modifier }`，排版由 HDS 决定，但默认会让长名称换行。
+ * 这里只补必要的截断：单行、省略号、按字符断（和自建行时一致）。字号/颜色留给 HDS 规格。
+ */
+class HomeRowTextModifier extends TextModifier {
+    applyNormalAttribute(instance: TextAttribute): void {
+        instance
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .wordBreak(WordBreak.BREAK_ALL);
+    }
+}
+
+/**
  * 一行连接。用 UI Design Kit 的 `HdsListItem`（内部就是带 HDS 规格的 ListItem）：
  * 文本走 `textItem`，横滑删除走 `swipeActionOptions`，选中态走 `isSelected`，
  * 右键菜单走 `menuStyle` + `menuBuilder`。
@@ -456,6 +470,7 @@ struct HomeConnectionListItem {
     };
     @Event onDeleteRequested: (row: HomeConnectionRow) => void = (_row: HomeConnectionRow): void => {
     };
+    private rowTextModifier: HomeRowTextModifier = new HomeRowTextModifier();
 
     @Builder
     rowMenu() {
@@ -509,11 +524,17 @@ struct HomeConnectionListItem {
         HdsListItem({
             hdsListItemCard: {
                 textItem: {
-                    primaryText: { text: this.row.connection.name },
+                    primaryText: {
+                        text: this.row.connection.name,
+                        modifier: this.rowTextModifier,
+                    },
                 },
                 suffixItem: new SuffixCustomBuilder((): void => {
                     this.rowTrailing();
                 }),
+                // 卡片要撑满整行：HDS 卡片默认留左右外沿，而选中背景是画在 ListItem 这一层的，
+                // 卡片比行窄就会看到"卡片外面套一层蓝底"。
+                cardWidth: '100%',
                 cardHeight: ROW_HEIGHT,
                 cardId: this.row.connection.id,
                 onClick: (): void => {
@@ -861,7 +882,8 @@ export struct Home {
                 .fontSize(12)
                 .fontColor($r('sys.color.font_tertiary'))
         }
-        // 与行一致：左右内边距交给 ListItemGroupStyle.CARD，避免和它的内沿叠加。
+        // 分组用的是 ListItemGroupStyle.NONE，没有系统内边距，组头的左右间距自己给。
+        .padding({ left: 8, right: 8 })
         .width('100%')
         .height(GROUP_HEADER_HEIGHT)
     }
@@ -1002,16 +1024,15 @@ export struct Home {
                         .padding(8)
                 }
 
-                // 分组列表：组头吸顶，组用 CARD 样式分卡。
-                // 左栏宽度被 NAV_BAR_MAX_WIDTH 限制住，这里始终是单列，所以不开 lanes；
-                // 行高固定（ROW_HEIGHT），List 对屏外条目按统一高度排布，不需要 childrenMainSize。
+                // 分组列表：组头吸顶。分组本身不用 ListItemGroupStyle.CARD——HdsListItemCard 已经
+                // 是卡片了，再套一层分组卡就会出现两层外框和双重内边距。
                 List({ space: GROUP_SECTION_SPACING }) {
                     Repeat(this.groupRows)
                         .each((groupItem: RepeatItem<HomeGroupRow>) => {
                             ListItemGroup({
                                 header: this.groupHeader(groupItem.item),
                                 space: GROUP_ITEM_SPACING,
-                                style: ListItemGroupStyle.CARD
+                                style: ListItemGroupStyle.NONE
                             }) {
                                 Repeat(groupItem.item.connections)
                                     .each((connectionItem: RepeatItem<HomeConnectionRow>) => {
