@@ -38,8 +38,8 @@ const MOVE_RADIO_GROUP = 'homeMoveConnectionGroup';
 const MAX_PORT = 65535;
 
 /**
- * 行高与组头高度显式固定；HdsListItemCard 用 cardHeight/cardWidth 等于这个尺寸，
- * 这样 HDS 画在 ListItem 层的选中背景不会被卡片露出来一圈。
+ * 行高与组头高度显式固定；HdsListItemCard 的 cardHeight 用同一个值。
+ * cardWidth 不要给百分比，见 HomeConnectionListItem 里的说明。
  */
 const ROW_HEIGHT = 48;
 const GROUP_HEADER_HEIGHT = 40;
@@ -532,16 +532,27 @@ struct HomeConnectionListItem {
                 suffixItem: new SuffixCustomBuilder((): void => {
                     this.rowTrailing();
                 }),
-                // 卡片要撑满整行：HDS 卡片默认留左右外沿，而选中背景是画在 ListItem 这一层的，
-                // 卡片比行窄就会看到"卡片外面套一层蓝底"。
-                cardWidth: '100%',
+                // cardWidth 不填百分比：HDS 在 ListItem 交叉轴尺寸确定之前就要这个值，
+                // 给 '100%' 实测得到 0，卡片内容直接看不见。
                 cardHeight: ROW_HEIGHT,
+                // 卡片底色自己定：常态用列表卡面，选中叠一层"激活"半透明色。
+                // 想换更重或更淡的选中效果，只改这一行：可选 comp_background_emphasize（强调）、
+                // ohos_id_color_emphasize_transparent、comp_background_secondary 等语义色。
+                cardBackgroundColor: this.isSelected
+                    ? $r('sys.color.ohos_id_color_component_activated_transparent')
+                    : $r('sys.color.comp_background_list_card'),
                 cardId: this.row.connection.id,
                 onClick: (): void => {
                     this.onRowOpen(this.row.connection.id);
                 },
             },
             isSelected: this.isSelected,
+            // 选中背景本来是画在 ListItem 这一层的，卡片比行窄就露成一圈蓝底；
+            // 这一层清空，选中态改画在卡片自己身上（cardBackgroundColor）。
+            listItemStateStyles: {
+                normalBackgroundColor: Color.Transparent,
+                selectedBackgroundColor: Color.Transparent,
+            },
             menuStyle: {
                 responseType: ResponseType.RightClick,
                 menuOptions: HOME_MENU_OPTIONS,
