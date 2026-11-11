@@ -5,7 +5,6 @@ import { parseCidr, WireGuardSettings } from '../core/config/WgSettings';
 import { TUN_INTERFACE_MTU } from '../core/config/Generation';
 
 const TAG = "Hv2ray-Settings"
-const LABEL_WIDTH = 160;
 
 interface WgFormFailure {
     reason: string;
@@ -173,71 +172,94 @@ export struct Settings {
                     .fontSize(13)
                     .fontColor($r('sys.color.font_tertiary'))
 
-                Row({ space: 8 }) {
-                    Text($r('app.string.wg_private_key'))
-                        .width(LABEL_WIDTH)
-                    TextInput({ placeholder: $r('app.string.wg_private_key_hint'), text: this.wgPrivateKey!! })
-                        .layoutWeight(1)
-                }
+                // 以本容器宽度为参照划分断点：窄屏标签在输入框上方，宽屏一行两列。
+                // columns 必须显式写 12，否则 API 20 起默认按 {xs:2,sm:4,md:8,lg:12} 夹取 span。
+                GridRow({
+                    gutter: { x: 8, y: 8 },
+                    columns: 12,
+                    breakpoints: { reference: BreakpointsReference.ComponentSize }
+                }) {
+                    GridCol({ span: { xs: 12, sm: 12, md: 4, lg: 4 } }) {
+                        Text($r('app.string.wg_private_key'))
+                    }
+                    GridCol({ span: { xs: 12, sm: 12, md: 8, lg: 8 } }) {
+                        TextInput({ placeholder: $r('app.string.wg_private_key_hint'), text: this.wgPrivateKey!! })
+                            .width('100%')
+                    }
 
-                Row({ space: 8 }) {
-                    Text($r('app.string.wg_peer_public_key'))
-                        .width(LABEL_WIDTH)
-                    TextInput({ placeholder: $r('app.string.wg_peer_public_key_hint'), text: this.wgPeerPublicKey!! })
-                        .layoutWeight(1)
-                }
+                    GridCol({ span: { xs: 12, sm: 12, md: 4, lg: 4 } }) {
+                        Text($r('app.string.wg_peer_public_key'))
+                    }
+                    GridCol({ span: { xs: 12, sm: 12, md: 8, lg: 8 } }) {
+                        TextInput({ placeholder: $r('app.string.wg_peer_public_key_hint'), text: this.wgPeerPublicKey!! })
+                            .width('100%')
+                    }
 
-                Row({ space: 8 }) {
-                    Text($r('app.string.wg_peer_endpoint'))
-                        .width(LABEL_WIDTH)
-                    TextInput({ placeholder: 'host:port', text: this.wgPeerEndpoint!! })
-                        .layoutWeight(1)
-                }
+                    GridCol({ span: { xs: 12, sm: 12, md: 4, lg: 4 } }) {
+                        Text($r('app.string.wg_peer_endpoint'))
+                    }
+                    GridCol({ span: { xs: 12, sm: 12, md: 8, lg: 8 } }) {
+                        TextInput({ placeholder: 'host:port', text: this.wgPeerEndpoint!! })
+                            .width('100%')
+                    }
 
-                Row({ space: 8 }) {
-                    Text($r('app.string.wg_local_ip'))
-                        .width(LABEL_WIDTH)
-                    TextInput({ placeholder: $r('app.string.wg_local_ip_hint'), text: this.wgLocalIp!! })
-                        .layoutWeight(1)
-                }
+                    GridCol({ span: { xs: 12, sm: 12, md: 4, lg: 4 } }) {
+                        Text($r('app.string.wg_local_ip'))
+                    }
+                    GridCol({ span: { xs: 12, sm: 12, md: 8, lg: 8 } }) {
+                        TextInput({ placeholder: $r('app.string.wg_local_ip_hint'), text: this.wgLocalIp!! })
+                            .width('100%')
+                    }
 
-                Row({ space: 8 }) {
-                    Text('MTU')
-                        .width(LABEL_WIDTH)
-                    TextInput({ placeholder: '1420', text: this.wgMtu!! })
-                        .type(InputType.Number)
-                        .layoutWeight(1)
-                }
+                    GridCol({ span: { xs: 12, sm: 12, md: 4, lg: 4 } }) {
+                        Text('MTU')
+                    }
+                    GridCol({ span: { xs: 12, sm: 12, md: 8, lg: 8 } }) {
+                        TextInput({ placeholder: '1420', text: this.wgMtu!! })
+                            .type(InputType.Number)
+                            .width('100%')
+                    }
 
-                Row({ space: 8 }) {
-                    Text($r('app.string.wg_keepalive'))
-                        .width(LABEL_WIDTH)
-                    TextInput({ placeholder: '25', text: this.wgKeepalive!! })
-                        .type(InputType.Number)
-                        .layoutWeight(1)
-                }
+                    GridCol({ span: { xs: 12, sm: 12, md: 4, lg: 4 } }) {
+                        Text($r('app.string.wg_keepalive'))
+                    }
+                    GridCol({ span: { xs: 12, sm: 12, md: 8, lg: 8 } }) {
+                        TextInput({ placeholder: '25', text: this.wgKeepalive!! })
+                            .type(InputType.Number)
+                            .width('100%')
+                    }
 
-                Column({ space: 4 }) {
-                    Text($r('app.string.wg_routes'))
-                    TextArea({ placeholder: $r('app.string.wg_routes_hint'), text: this.wgRoutes!! })
-                        .height(140)
+                    GridCol({ span: { xs: 12, sm: 12, md: 12, lg: 12 } }) {
+                        Column({ space: 4 }) {
+                            Text($r('app.string.wg_routes'))
+                            TextArea({ placeholder: $r('app.string.wg_routes_hint'), text: this.wgRoutes!! })
+                                .constraintSize({ minHeight: 100 })
+                                .width('100%')
+                        }
                         .width('100%')
-                }
-                .width('100%')
+                    }
 
-                Row({ space: 16 }) {
-                    Button($r('app.string.btn_save'))
-                        .onClick(async () => {
-                            await this.doSave();
-                        })
-                    Button($r('app.string.btn_reload'))
-                        .onClick(() => {
-                            this.loadFromManager();
-                        })
+                    GridCol({ span: { xs: 6, sm: 6, md: 4, lg: 4 } }) {
+                        Button($r('app.string.btn_save'))
+                            .width('100%')
+                            .onClick(async () => {
+                                await this.doSave();
+                            })
+                    }
+                    GridCol({ span: { xs: 6, sm: 6, md: 4, lg: 4 } }) {
+                        Button($r('app.string.btn_reload'))
+                            .width('100%')
+                            .onClick(() => {
+                                this.loadFromManager();
+                            })
+                    }
                 }
+                .alignItems(ItemAlign.Center)
+                .width('100%')
             }
             .alignItems(HorizontalAlign.Start)
             .width('100%')
+            .constraintSize({ maxWidth: 900 })
             .padding(16)
         }
         .width('100%')

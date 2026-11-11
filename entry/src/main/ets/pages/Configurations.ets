@@ -87,23 +87,33 @@ export struct Configurations {
 
     build() {
         Column({ space: 16 }) {
-            Row ({ space: 8 }) {
-                TextInput({ placeholder: $r('app.string.cfg_sub_link_hint'), text: this.subscriptionLink!! })
-                    .height('100%')
-                    .layoutWeight(1)
+            // 以本容器宽度为参照划分断点：窄屏输入框与操作分行，宽屏一行排完。
+            // columns 必须显式写 12，否则 API 20 起默认按 {xs:2,sm:4,md:8,lg:12} 夹取 span。
+            GridRow({
+                gutter: { x: 8, y: 8 },
+                columns: 12,
+                breakpoints: { reference: BreakpointsReference.ComponentSize }
+            }) {
+                GridCol({ span: { xs: 12, sm: 12, md: 6, lg: 8 } }) {
+                    TextInput({ placeholder: $r('app.string.cfg_sub_link_hint'), text: this.subscriptionLink!! })
+                        .width('100%')
+                }
 
-                this.useProxyCheckbox();
-                Button($r('app.string.cfg_btn_get'))
-                    .onClick(async () => {
-                        Logger.Warn(TAG, `GET using proxy: ${this.useProxy}`)
-                        await this.doGetSubscriptionData();
-                    })
-                    .height('100%')
+                GridCol({ span: { xs: 6, sm: 6, md: 3, lg: 2 } }) {
+                    this.useProxyCheckbox();
+                }
 
+                GridCol({ span: { xs: 6, sm: 6, md: 3, lg: 2 } }) {
+                    Button($r('app.string.cfg_btn_get'))
+                        .width('100%')
+                        .onClick(async () => {
+                            Logger.Warn(TAG, `GET using proxy: ${this.useProxy}`)
+                            await this.doGetSubscriptionData();
+                        })
+                }
             }
-            .justifyContent(FlexAlign.Center)
+            .alignItems(ItemAlign.Center)
             .width('100%')
-            .height(40)
 
             Column({ space: 8 }) {
                 Text($r('app.string.cfg_sub_content'))
@@ -111,16 +121,20 @@ export struct Configurations {
                     ForEach(this.subscriptionContent, (item: string) => {
                         ListItem() {
                             Text(item)
+                                .maxLines(2)
+                                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                                .wordBreak(WordBreak.BREAK_ALL)
                         }
                         .border({ color: Color.Red, width: 1 })
                         .backgroundColor($r('sys.color.gray_03'))
                     })
                 }
                 .width('100%')
-                .height(250)
+                .layoutWeight(1)
                 .backgroundColor($r('sys.color.gray_02'))
             }
             .layoutWeight(1)
+            .width('100%')
 
             Button($r('app.string.cfg_btn_decode'))
                 .margin(16)
@@ -135,16 +149,20 @@ export struct Configurations {
                     ForEach(this.decoded, (item: string) => {
                         ListItem() {
                             Text(item)
+                                .maxLines(2)
+                                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                                .wordBreak(WordBreak.BREAK_ALL)
                         }
                         .border({ color: Color.Green, width: 1 })
                         .backgroundColor($r('sys.color.gray_03'))
                     })
                 }
                 .width('100%')
-                .height(250)
+                .layoutWeight(1)
                 .backgroundColor($r('sys.color.gray_02'))
             }
             .layoutWeight(1)
+            .width('100%')
         }
         .width('100%')
         .height('100%')

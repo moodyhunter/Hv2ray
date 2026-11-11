@@ -1,4 +1,4 @@
-import { Stat } from "../utils/Common";
+import { KernelEvent, KernelEventType, Stat } from "../utils/Common";
 import { CommonEventUtils } from "../utils/CommonEventUtils";
 
 export function prettyPrintBytes(bytes: number): string {
@@ -56,3 +56,35 @@ export class GuiStatObject {
 
 let statObject = new GuiStatObject();
 export { statObject as GlobalStat };
+
+@ObservedV2
+export class GuiKernelStatusObject {
+    @Trace status: KernelEventType = KernelEventType.Stopped;
+
+    constructor() {
+        CommonEventUtils.subscribeKernelEvent((event: KernelEvent) => {
+            this.status = event.type;
+        });
+    }
+}
+
+let kernelStatusObject = new GuiKernelStatusObject();
+export { kernelStatusObject as GlobalKernelStatus };
+
+export function kernelStatusColor(status: KernelEventType): Color {
+    switch (status) {
+        case KernelEventType.Starting: return Color.Yellow;
+        case KernelEventType.Started: return Color.Green;
+        case KernelEventType.Crashed: return Color.Red;
+        case KernelEventType.Stopped: return Color.Blue;
+    }
+}
+
+export function kernelStatusLabel(status: KernelEventType): Resource {
+    switch (status) {
+        case KernelEventType.Starting: return $r('app.string.status_starting');
+        case KernelEventType.Started: return $r('app.string.status_started');
+        case KernelEventType.Crashed: return $r('app.string.status_crashed');
+        case KernelEventType.Stopped: return $r('app.string.status_stopped');
+    }
+}
